@@ -1,5 +1,4 @@
 package com.banglarai.app
-
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
@@ -28,28 +27,22 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.util.Locale
-
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
-    private val green = Color.rgb(0, 255, 145)
+private val green = Color.rgb(0, 255, 145)
     private val dark = Color.rgb(5, 15, 12)
-
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
+private val mainHandler = Handler(Looper.getMainLooper())
+private var tts: TextToSpeech? = null
+private var ttsReady = false
     private var recognizer: SpeechRecognizer? = null
     private var isListening = false
     private var isHomeVisible = false
-
-    private lateinit var chatBox: LinearLayout
+private lateinit var chatBox: LinearLayout
     private lateinit var chatScroll: ScrollView
     private lateinit var inputBox: EditText
     private lateinit var statusText: TextView
-
-    private val permissionCode = 101
-
-    private val introRunnable = Runnable {
+private val permissionCode = 101
+private val introRunnable = Runnable {
         if (!isFinishing && !isDestroyed) {
             showHome()
         }

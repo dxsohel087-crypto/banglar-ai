@@ -1,4 +1,3 @@
-
 name: Banglar AI APK Build
 
 on:
@@ -32,12 +31,36 @@ jobs:
         run: |
           python3 -c "import xml.etree.ElementTree as ET; ET.parse('app/src/main/AndroidManifest.xml'); print('Manifest XML is valid')"
 
+      - name: Diagnose Kotlin Compilation
+        id: kotlin_check
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          gradle :app:compileDebugKotlin --stacktrace --info --console=plain 2>&1 | tee kotlin-build.log
+          STATUS=${PIPESTATUS[0]}
+
+          echo ""
+          echo "========== KOTLIN ERROR SUMMARY =========="
+          grep -n -E '(^e: |error:|MainActivity\.kt:|Compilation error)' kotlin-build.log | head -80 || true
+          echo "=========================================="
+
+          exit "$STATUS"
+
       - name: Build APK
-        run: gradle :app:assembleDebug --stacktrace --info
+        if: steps.kotlin_check.outcome == 'success'
+        run: gradle :app:assembleDebug --stacktrace --info --console=plain
 
       - name: Upload APK
-        if: success()
+        if: steps.kotlin_check.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: Banglar-AI-APK
           path: app/build/outputs/apk/debug/*.apk
+
+      - name: Report Kotlin Failure
+        if: steps.kotlin_check.outcome == 'failure'
+        run: |
+          echo "Kotlin compilation failed."
+          echo "See the Diagnose Kotlin Compilation step for the exact error."
+          exit 1

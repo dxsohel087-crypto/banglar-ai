@@ -1,7 +1,10 @@
 package com.banglarai.app
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -12,6 +15,10 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -20,17 +27,26 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import java.util.Locale
 
-class MainActivity : Activity() {
+class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private val green = Color.rgb(0, 255, 145)
     private val dark = Color.rgb(5, 15, 12)
-
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
+    private var recognizer: SpeechRecognizer? = null
+    private var isListening = false
+    private var isHomeVisible = false
 
     private lateinit var chatBox: LinearLayout
     private lateinit var chatScroll: ScrollView
     private lateinit var inputBox: EditText
+    private lateinit var statusText: TextView
+
+    private val permissionCode = 101
 
     private val introRunnable = Runnable {
         if (!isFinishing && !isDestroyed) {
@@ -44,17 +60,18 @@ class MainActivity : Activity() {
         window.statusBarColor = dark
         window.navigationBarColor = dark
 
+        tts = TextToSpeech(this, this)
+
         showIntro()
     }
 
-    // INTRO SCREEN
+    // Intro Screen
     private fun showIntro() {
 
         val screen = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(dp(20), dp(20), dp(20), dp(20))
-
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 intArrayOf(
@@ -106,8 +123,10 @@ class MainActivity : Activity() {
         mainHandler.postDelayed(introRunnable, 2200)
     }
 
-    // MAIN CHAT SCREEN
+    // Main Chat Screen
     private fun showHome() {
+
+        isHomeVisible = true
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -115,7 +134,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(7, 17, 14))
         }
 
-        // HEADER
+        // Header
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -138,8 +157,8 @@ class MainActivity : Activity() {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("বাংলার AI সেটিংস")
                     .setMessage(
-                        "বাংলার AI পরীক্ষামূলক সংস্করণ।\n\n" +
-                        "পরবর্তী ধাপে মাইক্রোফোন ও AI সার্ভার যুক্ত করা হবে।"
+                        "বাংলা ভয়েস এবং মাইক্রোফোন পরীক্ষা করুন।\n\n" +
+                        "আসল AI সার্ভার সংযোগ পরবর্তী ধাপে যোগ করা হবে।"
                     )
                     .setPositiveButton("ঠিক আছে", null)
                     .show()
@@ -158,17 +177,17 @@ class MainActivity : Activity() {
 
         root.addView(header)
 
-        // STATUS
-        val status = TextView(this).apply {
+        // Status
+        statusText = TextView(this).apply {
             text = "● প্রস্তুত"
             textSize = 13f
             setTextColor(green)
             setPadding(dp(4), dp(5), 0, dp(12))
         }
 
-        root.addView(status)
+        root.addView(statusText)
 
-        // CHAT AREA
+        // Chat Area
         chatScroll = ScrollView(this).apply {
             isFillViewport = true
         }
@@ -189,14 +208,13 @@ class MainActivity : Activity() {
             )
         )
 
-        // WELCOME MESSAGE
         addMessage(
             "আসসালামু আলাইকুম! আমি বাংলার AI। " +
-            "আপনাকে স্বাগতম। আপনি এখানে লিখে কথা বলতে পারেন।",
+            "আপনি লিখে অথবা মাইক্রোফোনে কথা বলে পরীক্ষা করতে পারেন।",
             false
         )
 
-        // INPUT AREA
+        // Bottom Input Area
         val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -208,9 +226,20 @@ class MainActivity : Activity() {
             textSize = 15f
             setTextColor(Color.WHITE)
             setHintTextColor(Color.GRAY)
-            singleLine = true
+            isSingleLine = true
             setPadding(dp(14), 0, dp(10), 0)
             background = rounded(Color.rgb(24, 39, 32), 18)
+        }
+
+        val micButton = Button(this).apply {
+            text = "🎙"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            background = rounded(Color.rgb(20, 65, 43), 18)
+
+            setOnClickListener {
+                checkMicrophonePermission()
+            }
         }
 
         val sendButton = Button(this).apply {
@@ -230,9 +259,16 @@ class MainActivity : Activity() {
         )
 
         bottom.addView(
+            micButton,
+            LinearLayout.LayoutParams(dp(55), dp(52)).apply {
+                marginStart = dp(6)
+            }
+        )
+
+        bottom.addView(
             sendButton,
-            LinearLayout.LayoutParams(dp(58), dp(52)).apply {
-                marginStart = dp(7)
+            LinearLayout.LayoutParams(dp(55), dp(52)).apply {
+                marginStart = dp(6)
             }
         )
 
@@ -241,7 +277,7 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    // ADD MESSAGE
+    // Add Chat Message
     private fun addMessage(message: String, isUser: Boolean) {
 
         val bubble = TextView(this).apply {
@@ -262,13 +298,7 @@ class MainActivity : Activity() {
 
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-
-            gravity = if (isUser) {
-                Gravity.END
-            } else {
-                Gravity.START
-            }
-
+            gravity = if (isUser) Gravity.END else Gravity.START
             setPadding(0, dp(5), 0, dp(5))
 
             addView(
@@ -287,7 +317,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // SEND MESSAGE
+    // Send Text Message
     private fun sendMessage() {
 
         val message = inputBox.text.toString().trim()
@@ -308,17 +338,283 @@ class MainActivity : Activity() {
         giveTestReply()
     }
 
-    // TEMPORARY AI REPLY
+    // Temporary Reply
     private fun giveTestReply() {
 
         val reply =
-            "আপনার কথাটি পেয়েছি। এটি বাংলার AI-এর পরীক্ষামূলক সংস্করণ। " +
-            "পরবর্তী ধাপে আসল AI সার্ভার সংযোগ করা হবে।"
+            "আপনার কথাটি পেয়েছি। এখনো AI সার্ভারের সঙ্গে সংযোগ করা হয়নি। " +
+            "পরবর্তী ধাপে আসল AI সংযোগ যোগ করব।"
 
         addMessage(reply, false)
+
+        if (ttsReady) {
+            tts?.speak(
+                reply,
+                TextToSpeech.QUEUE_FLUSH,
+                Bundle(),
+                "banglar_ai_reply"
+            )
+        }
     }
 
-    // ROUNDED BACKGROUND
+    // Microphone Permission
+    private fun checkMicrophonePermission() {
+
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+
+            requestPermissions(
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                permissionCode
+            )
+
+        } else {
+            startListening()
+        }
+    }
+
+    // Start Speech Recognition
+    private fun startListening() {
+
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                startListening()
+            }
+            return
+        }
+
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(
+                this,
+                "এই ফোনে Speech Recognition পাওয়া যাচ্ছে না",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        if (isFinishing || isDestroyed || !isHomeVisible) {
+            return
+        }
+
+        try {
+
+            // Stop previous recognition session
+            destroyRecognizer()
+
+            // Create on Main Thread
+            recognizer = SpeechRecognizer.createSpeechRecognizer(this)
+
+            recognizer?.setRecognitionListener(
+                object : RecognitionListener {
+
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        if (!isHomeVisible) return
+
+                        isListening = true
+                        statusText.text = "● শুনছি..."
+                    }
+
+                    override fun onBeginningOfSpeech() {}
+
+                    override fun onRmsChanged(rmsdB: Float) {}
+
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+
+                    override fun onEndOfSpeech() {
+                        if (isHomeVisible) {
+                            statusText.text = "● কথা বুঝছি..."
+                        }
+                    }
+
+                    override fun onError(error: Int) {
+
+                        isListening = false
+
+                        if (isHomeVisible && !isFinishing) {
+                            statusText.text = "● প্রস্তুত"
+
+                            Toast.makeText(
+                                this@MainActivity,
+                                "কথা শোনা যায়নি। আবার চেষ্টা করুন।",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+
+                        destroyRecognizer()
+                    }
+
+                    override fun onResults(results: Bundle?) {
+
+                        isListening = false
+
+                        if (!isHomeVisible || isFinishing) {
+                            destroyRecognizer()
+                            return
+                        }
+
+                        statusText.text = "● প্রস্তুত"
+
+                        val matches = results?.getStringArrayList(
+                            SpeechRecognizer.RESULTS_RECOGNITION
+                        )
+
+                        val spokenText = matches?.firstOrNull()
+
+                        if (!spokenText.isNullOrBlank()) {
+                            addMessage(spokenText, true)
+                            giveTestReply()
+                        }
+
+                        destroyRecognizer()
+                    }
+
+                    override fun onPartialResults(
+                        partialResults: Bundle?
+                    ) {}
+
+                    override fun onEvent(
+                        eventType: Int,
+                        params: Bundle?
+                    ) {}
+                }
+            )
+
+            val speechIntent = Intent(
+                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+            ).apply {
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                )
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE,
+                    "bn-BD"
+                )
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
+                    "bn-BD"
+                )
+
+                putExtra(
+                    RecognizerIntent.EXTRA_MAX_RESULTS,
+                    1
+                )
+            }
+
+            recognizer?.startListening(speechIntent)
+
+            isListening = true
+            statusText.text = "● শুনছি..."
+
+        } catch (e: Exception) {
+
+            isListening = false
+            destroyRecognizer()
+
+            if (isHomeVisible) {
+                statusText.text = "● প্রস্তুত"
+
+                Toast.makeText(
+                    this,
+                    "মাইক্রোফোন চালু করা যায়নি",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    // Safely Destroy Speech Recognizer
+    private fun destroyRecognizer() {
+
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                destroyRecognizer()
+            }
+            return
+        }
+
+        try {
+            recognizer?.cancel()
+            recognizer?.destroy()
+        } catch (_: Exception) {
+        }
+
+        recognizer = null
+        isListening = false
+    }
+
+    // Permission Result
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults
+        )
+
+        if (requestCode == permissionCode) {
+
+            if (
+                grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            ) {
+                startListening()
+            } else {
+
+                Toast.makeText(
+                    this,
+                    "মাইক্রোফোন অনুমতি প্রয়োজন",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    // Text To Speech Initialization
+    override fun onInit(status: Int) {
+
+        if (status == TextToSpeech.SUCCESS) {
+
+            val result = tts?.setLanguage(
+                Locale("bn", "BD")
+            )
+
+            ttsReady =
+                result != null &&
+                result != TextToSpeech.LANG_MISSING_DATA &&
+                result != TextToSpeech.LANG_NOT_SUPPORTED
+
+        } else {
+            ttsReady = false
+        }
+    }
+
+    // Pause Resources
+    override fun onPause() {
+
+        super.onPause()
+
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            destroyRecognizer()
+        }
+
+        tts?.stop()
+    }
+
+    // Resume
+    override fun onResume() {
+        super.onResume()
+    }
+
+    // Rounded Background
     private fun rounded(
         color: Int,
         radius: Int
@@ -330,25 +626,38 @@ class MainActivity : Activity() {
         }
     }
 
-    // DP CONVERTER
+    // DP Converter
     private fun dp(value: Int): Int {
         return (
             value * resources.displayMetrics.density
         ).toInt()
     }
 
-    // ACTIVITY DESTROY
+    // Activity Destroy
     override fun onDestroy() {
+
         mainHandler.removeCallbacks(introRunnable)
+
+        isHomeVisible = false
+
+        destroyRecognizer()
+
+        ttsReady = false
+
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
+
         super.onDestroy()
     }
 
-    // GREEN AI ORB
+    // Green AI Orb
     private inner class OrbView : View(this@MainActivity) {
 
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         override fun onDraw(canvas: Canvas) {
+
             super.onDraw(canvas)
 
             val cx = width / 2f

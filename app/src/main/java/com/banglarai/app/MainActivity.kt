@@ -1,728 +1,728 @@
-package com.banglarai.app
-
-import android.Manifest
-import android.app.Activity
-import android.app.AlertDialog
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RadialGradient
-import android.graphics.Shader
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.view.Gravity
-import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import android.widget.Toast
-import java.util.Locale
-
-class MainActivity : Activity(), TextToSpeech.OnInitListener {
-
-    private val green = Color.rgb(0, 255, 145)
-    private val dark = Color.rgb(5, 15, 12)
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
-    private var recognizer: SpeechRecognizer? = null
-    private var isListening = false
-    private var isHomeVisible = false
-
-    private lateinit var chatBox: LinearLayout
-    private lateinit var chatScroll: ScrollView
-    private lateinit var inputBox: EditText
-    private lateinit var statusText: TextView
-
-    private val permissionCode = 101
-
-    private val introRunnable = Runnable {
-        if (!isFinishing && !isDestroyed) {
-            showHome()
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        window.statusBarColor = dark
-        window.navigationBarColor = dark
-
-        tts = TextToSpeech(this, this)
-
-        showIntro()
-    }
-
-    // Intro Screen
-    private fun showIntro() {
-
-        val screen = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(20), dp(20), dp(20), dp(20))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(
-                    Color.rgb(3, 28, 18),
-                    Color.rgb(3, 10, 9),
-                    Color.BLACK
-                )
-            )
-        }
-
-        val orb = OrbView()
-
-        screen.addView(
-            orb,
-            LinearLayout.LayoutParams(dp(190), dp(190))
-        )
-
-        val title = TextView(this).apply {
-            text = "বাংলার AI"
-            textSize = 34f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(green)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(20), 0, dp(8))
-        }
-
-        val subtitle = TextView(this).apply {
-            text = "আপনার বাংলা AI সহকারী"
-            textSize = 16f
-            setTextColor(Color.LTGRAY)
-            gravity = Gravity.CENTER
-        }
-
-        val loading = TextView(this).apply {
-            text = "প্রস্তুত হচ্ছে..."
-            textSize = 13f
-            setTextColor(green)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(28), 0, 0)
-        }
-
-        screen.addView(title)
-        screen.addView(subtitle)
-        screen.addView(loading)
-
-        setContentView(screen)
-
-        mainHandler.removeCallbacks(introRunnable)
-        mainHandler.postDelayed(introRunnable, 2200)
-    }
-
-    // Main Chat Screen
-    private fun showHome() {
-
-        isHomeVisible = true
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-            setBackgroundColor(Color.rgb(7, 17, 14))
-        }
-
-        // Header
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val heading = TextView(this).apply {
-            text = "বাংলার AI"
-            textSize = 25f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(green)
-        }
-
-        val settings = Button(this).apply {
-            text = "⚙"
-            textSize = 21f
-            setTextColor(green)
-            background = rounded(Color.rgb(18, 38, 29), 14)
-
-            setOnClickListener {
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("বাংলার AI সেটিংস")
-                    .setMessage(
-                        "বাংলা ভয়েস এবং মাইক্রোফোন পরীক্ষা করুন।\n\n" +
-                        "আসল AI সার্ভার সংযোগ পরবর্তী ধাপে যোগ করা হবে।"
-                    )
-                    .setPositiveButton("ঠিক আছে", null)
-                    .show()
-            }
-        }
-
-        header.addView(
-            heading,
-            LinearLayout.LayoutParams(0, dp(52), 1f)
-        )
-
-        header.addView(
-            settings,
-            LinearLayout.LayoutParams(dp(52), dp(48))
-        )
-
-        root.addView(header)
-
-        // Status
-        statusText = TextView(this).apply {
-            text = "● প্রস্তুত"
-            textSize = 13f
-            setTextColor(green)
-            setPadding(dp(4), dp(5), 0, dp(12))
-        }
-
-        root.addView(statusText)
-
-        // Chat Area
-        chatScroll = ScrollView(this).apply {
-            isFillViewport = true
-        }
-
-        chatBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(3), dp(8), dp(3), dp(12))
-        }
-
-        chatScroll.addView(chatBox)
-
-        root.addView(
-            chatScroll,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-        )
-
-        addMessage(
-            "আসসালামু আলাইকুম! আমি বাংলার AI। " +
-            "আপনি লিখে অথবা মাইক্রোফোনে কথা বলে পরীক্ষা করতে পারেন।",
-            false
-        )
-
-        // Bottom Input Area
-        val bottom = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, dp(4))
-        }
-
-        inputBox = EditText(this).apply {
-            hint = "এখানে লিখুন..."
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.GRAY)
-            isSingleLine = true
-            setPadding(dp(14), 0, dp(10), 0)
-            background = rounded(Color.rgb(24, 39, 32), 18)
-        }
-
-        val micButton = Button(this).apply {
-            text = "🎙"
-            textSize = 20f
-            setTextColor(Color.WHITE)
-            background = rounded(Color.rgb(20, 65, 43), 18)
-
-            setOnClickListener {
-                checkMicrophonePermission()
-            }
-        }
-
-        val sendButton = Button(this).apply {
-            text = "➤"
-            textSize = 20f
-            setTextColor(Color.BLACK)
-            background = rounded(green, 18)
-
-            setOnClickListener {
-                sendMessage()
-            }
-        }
-
-        bottom.addView(
-            inputBox,
-            LinearLayout.LayoutParams(0, dp(52), 1f)
-        )
-
-        bottom.addView(
-            micButton,
-            LinearLayout.LayoutParams(dp(55), dp(52)).apply {
-                marginStart = dp(6)
-            }
-        )
-
-        bottom.addView(
-            sendButton,
-            LinearLayout.LayoutParams(dp(55), dp(52)).apply {
-                marginStart = dp(6)
-            }
-        )
-
-        root.addView(bottom)
-
-        setContentView(root)
-    }
-
-    // Add Chat Message
-    private fun addMessage(message: String, isUser: Boolean) {
-
-        val bubble = TextView(this).apply {
-            text = message
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            setPadding(dp(14), dp(11), dp(14), dp(11))
-
-            background = rounded(
-                if (isUser) {
-                    Color.rgb(17, 91, 57)
-                } else {
-                    Color.rgb(25, 39, 32)
-                },
-                17
-            )
-        }
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = if (isUser) Gravity.END else Gravity.START
-            setPadding(0, dp(5), 0, dp(5))
-
-            addView(
-                bubble,
-                LinearLayout.LayoutParams(
-                    (resources.displayMetrics.widthPixels * 0.78f).toInt(),
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
-
-        chatBox.addView(row)
-
-        chatScroll.post {
-            chatScroll.fullScroll(View.FOCUS_DOWN)
-        }
-    }
-
-    // Send Text Message
-    private fun sendMessage() {
-
-        val message = inputBox.text.toString().trim()
-
-        if (message.isEmpty()) {
-            Toast.makeText(
-                this,
-                "আগে কিছু লিখুন",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        inputBox.setText("")
-
-        addMessage(message, true)
-
-        giveTestReply()
-    }
-
-    // Temporary Reply
-    private fun giveTestReply() {
-
-        val reply =
-            "আপনার কথাটি পেয়েছি। এখনো AI সার্ভারের সঙ্গে সংযোগ করা হয়নি। " +
-            "পরবর্তী ধাপে আসল AI সংযোগ যোগ করব।"
-
-        addMessage(reply, false)
-
-        if (ttsReady) {
-            tts?.speak(
-                reply,
-                TextToSpeech.QUEUE_FLUSH,
-                Bundle(),
-                "banglar_ai_reply"
-            )
-        }
-    }
-
-    // Microphone Permission
-    private fun checkMicrophonePermission() {
-
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            requestPermissions(
-                arrayOf(Manifest.permission.RECORD_AUDIO),
-                permissionCode
-            )
-
-        } else {
-            startListening()
-        }
-    }
-
-    // Start Speech Recognition
-    private fun startListening() {
-
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post {
-                startListening()
-            }
-            return
-        }
-
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(
-                this,
-                "এই ফোনে Speech Recognition পাওয়া যাচ্ছে না",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-
-        if (isFinishing || isDestroyed || !isHomeVisible) {
-            return
-        }
-
-        try {
-
-            // Stop previous recognition session
-            destroyRecognizer()
-
-            // Create on Main Thread
-            recognizer = SpeechRecognizer.createSpeechRecognizer(this)
-
-            recognizer?.setRecognitionListener(
-                object : RecognitionListener {
-
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        if (!isHomeVisible) return
-
-                        isListening = true
-                        statusText.text = "● শুনছি..."
-                    }
-
-                    override fun onBeginningOfSpeech() {}
-
-                    override fun onRmsChanged(rmsdB: Float) {}
-
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-
-                    override fun onEndOfSpeech() {
-                        if (isHomeVisible) {
-                            statusText.text = "● কথা বুঝছি..."
-                        }
-                    }
-
-                    override fun onError(error: Int) {
-
-                        isListening = false
-
-                        if (isHomeVisible && !isFinishing) {
-                            statusText.text = "● প্রস্তুত"
-
-                            Toast.makeText(
-                                this@MainActivity,
-                                "কথা শোনা যায়নি। আবার চেষ্টা করুন।",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-
-                        destroyRecognizer()
-                    }
-
-                    override fun onResults(results: Bundle?) {
-
-                        isListening = false
-
-                        if (!isHomeVisible || isFinishing) {
-                            destroyRecognizer()
-                            return
-                        }
-
-                        statusText.text = "● প্রস্তুত"
-
-                        val matches = results?.getStringArrayList(
-                            SpeechRecognizer.RESULTS_RECOGNITION
-                        )
-
-                        val spokenText = matches?.firstOrNull()
-
-                        if (!spokenText.isNullOrBlank()) {
-                            addMessage(spokenText, true)
-                            giveTestReply()
-                        }
-
-                        destroyRecognizer()
-                    }
-
-                    override fun onPartialResults(
-                        partialResults: Bundle?
-                    ) {}
-
-                    override fun onEvent(
-                        eventType: Int,
-                        params: Bundle?
-                    ) {}
-                }
-            )
-
-            val speechIntent = Intent(
-                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-            ).apply {
-
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE,
-                    "bn-BD"
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                    "bn-BD"
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_MAX_RESULTS,
-                    1
-                )
-            }
-
-            recognizer?.startListening(speechIntent)
-
-            isListening = true
-            statusText.text = "● শুনছি..."
-
-        } catch (e: Exception) {
-
-            isListening = false
-            destroyRecognizer()
-
-            if (isHomeVisible) {
-                statusText.text = "● প্রস্তুত"
-
-                Toast.makeText(
-                    this,
-                    "মাইক্রোফোন চালু করা যায়নি",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
-
-    // Safely Destroy Speech Recognizer
-    private fun destroyRecognizer() {
-
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post {
-                destroyRecognizer()
-            }
-            return
-        }
-
-        try {
-            recognizer?.cancel()
-            recognizer?.destroy()
-        } catch (_: Exception) {
-        }
-
-        recognizer = null
-        isListening = false
-    }
-
-    // Permission Result
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-
-        super.onRequestPermissionsResult(
-            requestCode,
-            permissions,
-            grantResults
-        )
-
-        if (requestCode == permissionCode) {
-
-            if (
-                grantResults.isNotEmpty() &&
-                grantResults[0] == PackageManager.PERMISSION_GRANTED
-            ) {
-                startListening()
-            } else {
-
-                Toast.makeText(
-                    this,
-                    "মাইক্রোফোন অনুমতি প্রয়োজন",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
-
-    // Text To Speech Initialization
-    override fun onInit(status: Int) {
-
-        if (status == TextToSpeech.SUCCESS) {
-
-            val result = tts?.setLanguage(
-                Locale("bn", "BD")
-            )
-
-            ttsReady =
-                result != null &&
-                result != TextToSpeech.LANG_MISSING_DATA &&
-                result != TextToSpeech.LANG_NOT_SUPPORTED
-
-        } else {
-            ttsReady = false
-        }
-    }
-
-    // Pause Resources
-    override fun onPause() {
-
-        super.onPause()
-
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            destroyRecognizer()
-        }
-
-        tts?.stop()
-    }
-
-    // Resume
-    override fun onResume() {
-        super.onResume()
-    }
-
-    // Rounded Background
-    private fun rounded(
-        color: Int,
-        radius: Int
-    ): GradientDrawable {
-
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-        }
-    }
-
-    // DP Converter
-    private fun dp(value: Int): Int {
-        return (
-            value * resources.displayMetrics.density
-        ).toInt()
-    }
-
-    // Activity Destroy
-    override fun onDestroy() {
-
-        mainHandler.removeCallbacks(introRunnable)
-
-        isHomeVisible = false
-
-        destroyRecognizer()
-
-        ttsReady = false
-
-        tts?.stop()
-        tts?.shutdown()
-        tts = null
-
-        super.onDestroy()
-    }
-
-    // Green AI Orb
-    private inner class OrbView : View(this@MainActivity) {
-
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-        override fun onDraw(canvas: Canvas) {
-
-            super.onDraw(canvas)
-
-            val cx = width / 2f
-            val cy = height / 2f
-
-            val radius =
-                width.coerceAtMost(height) * 0.38f
-
-            paint.shader = RadialGradient(
-                cx,
-                cy,
-                radius * 1.8f,
-                intArrayOf(
-                    Color.rgb(100, 255, 190),
-                    Color.rgb(0, 190, 105),
-                    Color.rgb(0, 55, 35),
-                    Color.TRANSPARENT
-                ),
-                floatArrayOf(
-                    0f,
-                    0.35f,
-                    0.72f,
-                    1f
-                ),
-                Shader.TileMode.CLAMP
-            )
-
-            canvas.drawCircle(
-                cx,
-                cy,
-                radius * 1.8f,
-                paint
-            )
-
-            paint.shader = null
-
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = dp(2).toFloat()
-            paint.color = green
-
-            canvas.drawCircle(
-                cx,
-                cy,
-                radius,
-                paint
-            )
-
-            paint.style = Paint.Style.FILL
-            paint.color = Color.rgb(25, 180, 105)
-
-            canvas.drawCircle(
-                cx,
-                cy,
-                radius * 0.65f,
-                paint
-            )
-
-            paint.color = Color.WHITE
-
-            canvas.drawCircle(
-                cx - radius * 0.18f,
-                cy - radius * 0.18f,
-                radius * 0.12f,
-                paint
-            )
-        }
-    }
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#07130f">
+<title>বাংলার AI - Futuristic</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+ --bg:#050e0a;
+ --panel:#10221a;
+ --green:#35ed91;
+ --text:#eafff1;
+ --muted:#91aa9a;
 }
+
+body{
+ background:radial-gradient(circle at top,#123b28,#050e0a 65%);
+ color:var(--text);
+ font-family:Arial,sans-serif;
+ min-height:100vh;
+ padding:15px;
+}
+
+.app{
+ max-width:480px;
+ margin:auto;
+ min-height:95vh;
+ display:flex;
+ flex-direction:column;
+}
+
+header{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ padding:12px 4px;
+}
+
+.logo{
+ font-size:24px;
+ font-weight:900;
+ color:var(--green);
+}
+
+.version{
+ background:#173b29;
+ color:var(--green);
+ padding:7px 12px;
+ border-radius:20px;
+ font-size:11px;
+}
+
+.subtitle{
+ color:var(--muted);
+ font-size:11px;
+ letter-spacing:2px;
+ margin-top:5px;
+}
+
+.orb-area{
+ height:245px;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ position:relative;
+}
+
+.orb{
+ width:165px;
+ height:165px;
+ border-radius:50%;
+ background:radial-gradient(circle at 30% 25%,
+ #fff 0%,#a5ffca 12%,#3bed8c 35%,
+ #087d45 65%,#022b17 100%);
+ box-shadow:0 0 30px #35ed9166,
+ 0 0 80px #35ed9133,
+ inset -15px -15px 30px #00351b;
+ display:flex;
+ justify-content:center;
+ align-items:center;
+ animation:float 3s infinite ease-in-out;
+}
+
+.orb-core{
+ width:55px;
+ height:55px;
+ border-radius:50%;
+ background:#ffffffc9;
+ box-shadow:0 0 40px white;
+}
+
+.orb.thinking{
+ animation:pulse .6s infinite alternate;
+}
+
+.orb.listening{
+ animation:pulse 1s infinite alternate;
+ background:radial-gradient(circle at 30% 25%,
+ #fff 0%,#ffc5a5 12%,#ed7a3b 35%,
+ #8d3108 65%,#2b0c02 100%);
+ box-shadow:0 0 30px #ed7a3b66,
+ 0 0 80px #ed7a3b33,
+ inset -15px -15px 30px #351300;
+}
+
+@keyframes float{
+ 50%{transform:translateY(-8px)}
+}
+
+@keyframes pulse{
+ to{transform:scale(1.12);filter:brightness(1.3)}
+}
+
+.status{
+ text-align:center;
+ color:var(--green);
+ font-size:14px;
+ font-weight:bold;
+ margin-bottom:13px;
+}
+
+.card{
+ background:#10221acc;
+ border:1px solid #244a35;
+ border-radius:17px;
+ padding:15px;
+ margin-bottom:12px;
+}
+
+.card-title{
+ color:var(--green);
+ font-size:11px;
+ font-weight:bold;
+ letter-spacing:1.5px;
+ margin-bottom:10px;
+}
+
+.chat{
+ height:220px;
+ overflow-y:auto;
+ display:flex;
+ flex-direction:column;
+ gap:10px;
+}
+
+.bubble{
+ padding:11px 13px;
+ border-radius:13px;
+ font-size:13px;
+ line-height:1.6;
+ max-width:90%;
+ overflow-wrap:anywhere;
+ white-space:pre-wrap;
+}
+
+.user{
+ align-self:flex-end;
+ background:#176b42;
+}
+
+.ai{
+ align-self:flex-start;
+ background:#1b3025;
+ border:1px solid #315b40;
+}
+
+.input-area{
+ display:flex;
+ gap:8px;
+ margin-bottom:12px;
+}
+
+input{
+ min-width:0;
+ flex:1;
+ background:#14281d;
+ border:1px solid #31543c;
+ border-radius:12px;
+ padding:14px;
+ color:white;
+ outline:none;
+ font-size:14px;
+}
+
+button{
+ border:none;
+ cursor:pointer;
+ border-radius:12px;
+ padding:12px;
+ font-weight:bold;
+}
+
+.send{
+ background:var(--green);
+ color:#042011;
+ font-size:18px;
+}
+
+.mic{
+ background:#17452e;
+ color:var(--green);
+ font-size:18px;
+}
+
+.controls{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:9px;
+}
+
+.control{
+ background:#152a1e;
+ color:#c9f9d9;
+ border:1px solid #31543c;
+ font-size:12px;
+ min-height:60px;
+}
+
+.control:active,button:active{
+ transform:scale(.96);
+}
+
+.power{
+ display:flex;
+ gap:10px;
+ margin-bottom:12px;
+}
+
+.power button{
+ flex:1;
+ padding:14px;
+}
+
+.on{
+ background:#18c875;
+ color:#042011;
+}
+
+.off{
+ background:#293b31;
+ color:white;
+}
+
+.footer{
+ text-align:center;
+ color:#607c69;
+ font-size:10px;
+ margin-top:auto;
+ padding:20px 0;
+}
+
+.settings{
+ display:none;
+}
+
+.clear{
+ background:#402321;
+ color:#ffb7a9;
+ width:100%;
+ margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<header>
+ <div>
+  <div class="logo">✦ বাংলার AI</div>
+  <div class="subtitle">FUTURISTIC PERSONAL ASSISTANT</div>
+ </div>
+ <div class="version">GROQ AI 1.0</div>
+</header>
+
+<div class="orb-area">
+ <div class="orb" id="orb">
+  <div class="orb-core"></div>
+ </div>
+</div>
+
+<div class="status" id="status">● AI বন্ধ আছে</div>
+
+<div class="power">
+ <button class="on" onclick="turnOn()">● ON</button>
+ <button class="off" onclick="turnOff()">■ OFF</button>
+ </div>
+
+<div class="card">
+ <div class="card-title">AI CONVERSATION</div>
+ <div class="chat" id="chat">
+  <div class="bubble ai">
+   আসসালামু আলাইকুম! আমি বাংলার AI।
+   আমাকে যেকোনো প্রশ্ন করতে পারেন।
+  </div>
+ </div>
+</div>
+
+<div class="input-area">
+ <input id="userInput" placeholder="আপনার নির্দেশ লিখুন..."
+ autocomplete="off">
+ <button class="send" onclick="sendText()">➤</button>
+ <button class="mic" onclick="startVoiceManual()">🎙</button>
+</div>
+
+<div class="card">
+ <div class="card-title">SMART MOBILE CONTROL</div>
+
+ <div class="controls">
+  <button class="control" onclick="mobileAction('wifi')">📶<br>Wi-Fi</button>
+  <button class="control" onclick="mobileAction('bluetooth')">ᛒ<br>Bluetooth</button>
+  <button class="control" onclick="mobileAction('flash')">🔦<br>Flashlight</button>
+  <button class="control" onclick="mobileAction('camera')">📷<br>Camera</button>
+  <button class="control" onclick="mobileAction('youtube')">▶<br>YouTube</button>
+  <button class="control" onclick="mobileAction('settings')">⚙<br>Settings</button>
+  <button class="control" onclick="mobileAction('facebook')">f<br>Facebook</button>
+  <button class="control" onclick="mobileAction('gallery')">🖼<br>Gallery</button>
+  <button class="control" onclick="mobileAction('brightness')">☀<br>Brightness</button>
+ </div>
+</div>
+
+<div class="card">
+ <div class="card-title">AI SETTINGS</div>
+ <button class="control" style="width:100%"
+ onclick="toggleSettings()">⚙ চ্যাট ইতিহাস মুছুন বা সেটিংস</button>
+
+ <div class="settings" id="settings">
+  <button class="clear" onclick="clearHistory()">
+   Clear Chat History
+  </button>
+  <p class="small" style="margin-top:10px; color:var(--muted); font-size:11px;">
+   API Key সফলভাবে কোডের সাথে যুক্ত করা আছে।
+  </p>
+ </div>
+</div>
+
+<div class="footer">
+ BANGLAR AI • POWERED BY GROQ<br>
+ MADE FOR SOHEL
+</div>
+
+</div>
+
+<script>
+
+const MODEL = "openai/gpt-oss-120b";
+const API_KEY = "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";
+
+let isOn = false;
+let busy = false;
+let recognition = null;
+let isListening = false;
+let torchStream = null;
+let torchOn = false;
+
+const orb = document.getElementById("orb");
+const status = document.getElementById("status");
+const chat = document.getElementById("chat");
+const userInput = document.getElementById("userInput");
+
+function addMessage(text,type){
+ const div = document.createElement("div");
+ div.className = "bubble " + type;
+ div.textContent = text;
+ chat.appendChild(div);
+ chat.scrollTop = chat.scrollHeight;
+}
+
+function clearHistory(){
+ chat.innerHTML = "";
+ addMessage("নতুন কথোপকথন শুরু হয়েছে।","ai");
+}
+
+function setStatus(text){
+ status.innerText = text;
+}
+
+function toggleSettings(){
+ const s = document.getElementById("settings");
+ s.style.display = s.style.display === "block" ? "none" : "block";
+}
+
+// ==================================
+// AUTOMATIC CONTINUOUS VOICE LOOP (CALL STYLE)
+// ==================================
+
+function initSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  
+  const rec = new SR();
+  rec.lang = "bn-BD";
+  rec.continuous = false;
+  rec.interimResults = false;
+
+  rec.onstart = () => {
+    isListening = true;
+    orb.classList.remove("thinking");
+    orb.classList.add("listening");
+    setStatus("🎙 আপনার কথা শুনছি... বলুন...");
+  };
+
+  rec.onresult = async (event) => {
+    const text = event.results[0][0].transcript.trim();
+    if(text) {
+      userInput.value = text;
+      addMessage(text, "user");
+      
+      stopListening();
+
+      const handled = await runCommand(text);
+      if(!handled) {
+        await askAI(text);
+      }
+    }
+  };
+
+  rec.onerror = (event) => {
+    isListening = false;
+    if(event.error !== "no-speech" && event.error !== "aborted") {
+      setStatus("ভয়েস সমস্যা: " + event.error);
+    }
+  };
+
+  rec.onend = () => {
+    isListening = false;
+    orb.classList.remove("listening");
+    if (isOn && !busy) {
+      setTimeout(() => {
+        startListeningAuto();
+      }, 500);
+    }
+  };
+
+  return rec;
+}
+
+function startListeningAuto() {
+  if (!isOn || busy || isListening) return;
+  if (!recognition) recognition = initSpeechRecognition();
+  
+  if (recognition) {
+    try {
+      recognition.start();
+    } catch(e) {}
+  }
+}
+
+function stopListening() {
+  if (recognition) {
+    try { recognition.abort(); } catch(e) {}
+  }
+  isListening = false;
+  orb.classList.remove("listening");
+}
+
+function startVoiceManual() {
+  if(!isOn){
+    setStatus("আগে AI চালু করুন");
+    return;
+  }
+  startListeningAuto();
+}
+
+// ==================================
+// VOICE OUTPUT (TEXT TO SPEECH) & AUTO LOOP RESUME
+// ==================================
+
+function speak(text){
+  if(!("speechSynthesis" in window)) {
+    resumeListeningAfterSpeech();
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const speech = new SpeechSynthesisUtterance(text);
+  speech.lang = "bn-BD";
+  speech.rate = 0.90;
+  speech.pitch = 1;
+
+  speech.onend = () => {
+    resumeListeningAfterSpeech();
+  };
+
+  speech.onerror = () => {
+    resumeListeningAfterSpeech();
+  };
+
+  window.speechSynthesis.speak(speech);
+}
+
+function resumeListeningAfterSpeech() {
+  if(isOn && !busy) {
+    setStatus("🎙 আপনার কথা শুনছি...");
+    startListeningAuto();
+  }
+}
+
+// ==================================
+// AI POWER ON / OFF
+// ==================================
+
+function turnOn(){
+  isOn = true;
+  busy = false;
+  setStatus("● বাংলার AI কল চালু হয়েছে");
+  speak("আসসালামু আলাইকুম। আমি বাংলার AI। বলুন, কী সাহায্য করতে পারি?");
+}
+
+function turnOff(){
+  isOn = false;
+  busy = false;
+  stopListening();
+  if("speechSynthesis" in window){
+    window.speechSynthesis.cancel();
+  }
+  orb.classList.remove("thinking", "listening");
+  setStatus("● AI বন্ধ আছে");
+}
+
+// ==================================
+// LOCAL MOBILE COMMANDS
+// ==================================
+
+async function mobileAction(action){
+  try{
+    switch(action){
+      case "wifi":
+        window.location.href = "intent:#Intent;action=android.settings.WIFI_SETTINGS;end";
+        return;
+      case "bluetooth":
+        window.location.href = "intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end";
+        return;
+      case "settings":
+        window.location.href = "intent:#Intent;action=android.settings.SETTINGS;end";
+        return;
+      case "camera":
+        window.location.href = "intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end";
+        return;
+      case "youtube":
+        window.location.href = "https://www.youtube.com/";
+        return;
+      case "facebook":
+        window.location.href = "https://www.facebook.com/";
+        return;
+      case "gallery":
+        window.location.href = "https://photos.google.com/";
+        return;
+      case "brightness":
+        window.location.href = "intent:#Intent;action=android.settings.DISPLAY_SETTINGS;end";
+        return;
+      case "flash":
+        await toggleFlash();
+        return;
+    }
+  }catch(error){
+    addMessage("এই কাজটি ব্রাউজার থেকে করা সম্ভব হয়নি।","ai");
+  }
+}
+
+async function toggleFlash(){
+  try{
+    if(!torchStream){
+      torchStream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:"environment"}
+      });
+    }
+    const track = torchStream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities();
+    if(!capabilities.torch){
+      addMessage("এই ব্রাউজার বা ক্যামেরায় Flashlight API সমর্থিত নয়।","ai");
+      speak("এই ক্যামেরায় ফ্ল্যাশলাইট সমর্থিত নয়।");
+      return;
+    }
+    torchOn = !torchOn;
+    await track.applyConstraints({
+      advanced:[{torch:torchOn}]
+    });
+    const msg = torchOn ? "Flashlight চালু হয়েছে।" : "Flashlight বন্ধ হয়েছে.";
+    addMessage(msg, "ai");
+    speak(msg);
+  }catch(error){
+    addMessage("Flashlight-এর জন্য ক্যামেরা অনুমতি দিন।","ai");
+  }
+}
+
+async function runCommand(text){
+  const q = text.toLowerCase();
+  if(q.includes("ফ্ল্যাশ") || q.includes("টর্চ") || q.includes("flashlight")){
+    await toggleFlash();
+    return true;
+  }
+  if(q.includes("ওয়াইফাই") || q.includes("ওয়াইফাই") || q.includes("wifi")){
+    await mobileAction("wifi");
+    speak("ওয়াইফাই সেটিংস খোলা হচ্ছে।");
+    return true;
+  }
+  if(q.includes("ব্লুটুথ") || q.includes("bluetooth")){
+    await mobileAction("bluetooth");
+    speak("ব্লুটুথ সেটিংস খোলা হচ্ছে।");
+    return true;
+  }
+  if(q.includes("ইউটিউব") || q.includes("youtube")){
+    await mobileAction("youtube");
+    speak("ইউটিউব ওপেন করা হচ্ছে।");
+    return true;
+  }
+  if(q.includes("ক্যামেরা") || q.includes("camera")){
+    await mobileAction("camera");
+    speak("ক্যামেরা চালু করা হচ্ছে।");
+    return true;
+  }
+  if(q.includes("ফেসবুক") || q.includes("facebook")){
+    await mobileAction("facebook");
+    speak("ফেসবুক ওপেন করা হচ্ছে।");
+    return true;
+  }
+  if(q.includes("গ্যালারি") || q.includes("gallery")){
+    await mobileAction("gallery");
+    speak("গ্যালারি খোলা হচ্ছে।");
+    return true;
+  }
+  return false;
+}
+
+// ==================================
+// GROQ AI
+// ==================================
+
+async function askAI(question){
+  stopListening();
+  orb.classList.add("thinking");
+  setStatus("AI চিন্তা করছে...");
+  busy = true;
+
+  try{
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":"Bearer "+API_KEY
+        },
+        body:JSON.stringify({
+          model: MODEL,
+          messages:[
+            {
+              role:"system",
+              content:"তুমি বাংলার AI। তুমি সোহেল ভাইয়ের ব্যক্তিগত বাংলা AI সহকারী। সহজ, সুন্দর, স্বাভাবিক বাংলায় সংক্ষিপ্ত উত্তর দেবে। তোমার নাম বাংলার AI। তোমাকে কে বানিয়েছে জিজ্ঞেস করলে বলবে, 'আমাকে দিনাজপুরের বোচাগঞ্জ উপজেলার মোল্লাপাড়ার সোহেল ভাই তৈরি করেছেন।' তুমি কোনো ফোনের কাজ সম্পন্ন হয়েছে বলে দাবি করবে না যদি সেটি বাস্তবে করা না হয়।"
+            },
+            {
+              role:"user",
+              content: question
+            }
+          ],
+          temperature:0.7,
+          max_tokens:1000
+        })
+      }
+    );
+
+    const data = await response.json();
+    if(!response.ok){
+      throw new Error(data.error?.message || "HTTP "+response.status);
+    }
+
+    const answer = data.choices?.[0]?.message?.content;
+    if(!answer) throw new Error("AI উত্তর পাওয়া যায়নি");
+
+    addMessage(answer, "ai");
+    setStatus("AI উত্তর দিচ্ছে...");
+    speak(answer);
+
+  }catch(error){
+    const err = "দুঃখিত, সংযোগে সমস্যা হয়েছে।";
+    addMessage(err, "ai");
+    speak(err);
+  }finally{
+    busy = false;
+    orb.classList.remove("thinking");
+  }
+}
+
+// ==================================
+// MANUAL SEND TEXT
+// ==================================
+
+async function sendText(){
+  const text = userInput.value.trim();
+  if(!text || busy) return;
+  if(!isOn){
+    addMessage("আগে ON বাটনে চাপ দিন।","ai");
+    return;
+  }
+
+  userInput.value = "";
+  addMessage(text, "user");
+  stopListening();
+
+  const handled = await runCommand(text);
+  if(!handled) {
+    await askAI(text);
+  }
+}
+
+userInput.addEventListener("keydown", e => {
+  if(e.key === "Enter"){
+    e.preventDefault();
+    sendText();
+  }
+});
+
+addEventListener("beforeunload", () => {
+  if(torchStream){
+    torchStream.getTracks().forEach(track => track.stop());
+  }
+});
+
+</script>
+
+</body>
+</html>

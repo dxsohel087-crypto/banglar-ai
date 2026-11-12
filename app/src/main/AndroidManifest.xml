@@ -10,7 +10,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="বাংলার AI"
+        android:label="Banglar AI"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 

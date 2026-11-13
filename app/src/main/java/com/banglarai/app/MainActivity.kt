@@ -387,22 +387,24 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val bubble = TextView(this).apply {
             text = (if (isUser) "আপনি: " else "বাংলার AI: ") + message
             textSize = 14f
+            gravity = if (isUser) Gravity.END else Gravity.START
             setTextColor(
                 if (isUser) Color.WHITE else Color.rgb(210, 255, 225)
             )
-            setPadding(dp(11), dp(9), dp(11), dp(9))
+            setPadding(dp(13), dp(10), dp(13), dp(10))
             background = rounded(
-                if (isUser) Color.rgb(24, 68, 48)
+                if (isUser) Color.rgb(0, 112, 70)
                 else Color.rgb(25, 44, 37),
-                12
+                15
             )
         }
 
         val params = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
-        params.setMargins(0, dp(4), 0, dp(4))
+        params.gravity = if (isUser) Gravity.END else Gravity.START
+        params.setMargins(dp(2), dp(5), dp(2), dp(5))
 
         chatLayout.addView(bubble, params)
         chatScroll.post {
@@ -433,7 +435,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (apiKey.isBlank()) {
             addMessage(
                 false,
-                "API Key বসানো হয়নি। কোডের API_KEY জায়গায় আপনার Groq API Key বসান।"
+                "API Key সেট করা হয়নি। সেটিংস থেকে “API Key সেট করুন” অপশনে গিয়ে নতুন Groq API Key সংরক্ষণ করুন।"
             )
             return
         }

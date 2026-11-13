@@ -19,6 +19,10 @@ class FloatingAssistantService : Service() {
     private var bubble: TextView? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == "com.banglarai.app.action.STOP_FLOATING") {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             stopSelf()
             return START_NOT_STICKY

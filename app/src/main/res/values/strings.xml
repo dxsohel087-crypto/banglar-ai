@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">বাংলার AI</string>
-    <string name="accessibility_service_description">বাংলার AI-এর ঐচ্ছিক অ্যাক্সেসিবিলিটি সার্ভিস। এই সংস্করণে অন্য অ্যাপের কনটেন্ট পড়া বা নিয়ন্ত্রণ করা হয় না।</string>
+    <string name="accessibility_service_description">আপনার নির্দেশে অন্য অ্যাপের দৃশ্যমান লেখা পড়া এবং নির্দিষ্ট দৃশ্যমান আইটেমে ক্লিক করার ঐচ্ছিক সুবিধা। এটি চালু বা বন্ধ করার নিয়ন্ত্রণ আপনার হাতে থাকবে।</string>
 </resources>

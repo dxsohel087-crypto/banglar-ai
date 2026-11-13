@@ -137,80 +137,135 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun showHome() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(8))
+            setPadding(dp(16), dp(12), dp(16), dp(10))
             setBackgroundColor(dark)
         }
 
+        // Top bar
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-
+        val brandBlock = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
         val heading = TextView(this).apply {
             text = "✦ বাংলার AI"
-            textSize = 23f
+            textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(green)
         }
-
+        val tagline = TextView(this).apply {
+            text = "আপনার ব্যক্তিগত AI সহকারী"
+            textSize = 11f
+            setTextColor(Color.LTGRAY)
+        }
+        brandBlock.addView(heading)
+        brandBlock.addView(tagline)
         val settingsButton = makeButton("⚙")
+        settingsButton.textSize = 20f
         settingsButton.setOnClickListener { showSettings() }
+        header.addView(brandBlock, LinearLayout.LayoutParams(0, dp(54), 1f))
+        header.addView(settingsButton, LinearLayout.LayoutParams(dp(48), dp(46)))
 
-        header.addView(
-            heading,
-            LinearLayout.LayoutParams(0, dp(48), 1f)
-        )
-        header.addView(
-            settingsButton,
-            LinearLayout.LayoutParams(dp(52), dp(44))
-        )
-
+        // Futuristic AI hero card
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.rgb(8, 48, 34), Color.rgb(12, 27, 23))
+            ).apply { cornerRadius = dp(22).toFloat() }
+        }
+        val orb = TextView(this).apply {
+            text = "✦"
+            textSize = 48f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(0, 255, 150), Color.rgb(0, 105, 72), Color.rgb(4, 30, 24))
+            ).apply {
+                shape = GradientDrawable.OVAL
+                setStroke(dp(2), Color.rgb(70, 255, 175))
+            }
+            elevation = dp(8).toFloat()
+        }
+        val heroTitle = TextView(this).apply {
+            text = "আমি আপনার কথা শুনতে প্রস্তুত"
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setPadding(0, dp(8), 0, dp(2))
+        }
         statusText = TextView(this).apply {
             text = "● AI প্রস্তুত"
             textSize = 12f
-            setTextColor(green)
-            setPadding(dp(3), dp(3), dp(3), dp(5))
-        }
-
-        val orb = TextView(this).apply {
-            text = "◉"
-            textSize = 48f
             gravity = Gravity.CENTER
             setTextColor(green)
-            setPadding(0, dp(2), 0, dp(2))
         }
-
-        powerButton = makeButton("AI চালু করুন")
+        powerButton = makeButton("🎙  AI ভয়েস চালু করুন")
+        powerButton.setTextColor(dark)
+        powerButton.background = rounded(green, 22)
         powerButton.setOnClickListener { toggleVoice() }
+
+        hero.addView(orb, LinearLayout.LayoutParams(dp(88), dp(88)))
+        hero.addView(heroTitle)
+        hero.addView(statusText)
+        val powerParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
+        )
+        powerParams.setMargins(dp(18), dp(10), dp(18), dp(2))
+        hero.addView(powerButton, powerParams)
+
+        // Chat panel
+        val chatHeading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val chatTitle = sectionTitle("AI CHAT")
+        val online = TextView(this).apply {
+            text = "● LIVE"
+            textSize = 10f
+            setTextColor(green)
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        chatHeading.addView(chatTitle, LinearLayout.LayoutParams(0, dp(34), 1f))
+        chatHeading.addView(online)
 
         chatScroll = ScrollView(this).apply {
             isFillViewport = true
-            background = rounded(cardColor, 16)
-            setPadding(dp(9), dp(9), dp(9), dp(9))
+            background = rounded(cardColor, 18)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
         }
-
         chatLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
         chatScroll.addView(chatLayout)
 
+        // Message composer
         val inputRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(8), 0, dp(5))
+            setPadding(0, dp(8), 0, dp(4))
         }
-
         inputBox = EditText(this).apply {
-            hint = "এখানে লিখুন..."
+            hint = "আপনার প্রশ্ন লিখুন..."
             setHintTextColor(Color.GRAY)
             setTextColor(Color.WHITE)
-            textSize = 15f
+            textSize = 14f
             isSingleLine = true
-            setPadding(dp(12), 0, dp(8), 0)
-            background = rounded(cardColor, 13)
+            setPadding(dp(14), 0, dp(8), 0)
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(18, 34, 29))
+                cornerRadius = dp(24).toFloat()
+                setStroke(dp(1), Color.rgb(35, 82, 61))
+            }
         }
-
         val micButton = makeButton("🎙")
+        micButton.textSize = 17f
         micButton.setOnClickListener {
             if (listening) {
                 stopListening()
@@ -219,84 +274,51 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 checkMicPermissionAndListen()
             }
         }
-
         val sendButton = makeButton("➤")
+        sendButton.textSize = 18f
         sendButton.setTextColor(dark)
-        sendButton.background = rounded(green, 13)
+        sendButton.background = rounded(green, 24)
         sendButton.setOnClickListener { sendMessage() }
 
-        inputRow.addView(
-            inputBox,
-            LinearLayout.LayoutParams(0, dp(49), 1f)
-        )
-        inputRow.addView(
-            micButton,
-            LinearLayout.LayoutParams(dp(49), dp(49))
-        )
-        inputRow.addView(
-            sendButton,
-            LinearLayout.LayoutParams(dp(49), dp(49))
-        )
+        inputRow.addView(inputBox, LinearLayout.LayoutParams(0, dp(48), 1f))
+        val micParams = LinearLayout.LayoutParams(dp(46), dp(46))
+        micParams.setMargins(dp(6), 0, dp(4), 0)
+        inputRow.addView(micButton, micParams)
+        inputRow.addView(sendButton, LinearLayout.LayoutParams(dp(46), dp(46)))
 
-        val controls1 = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        val controls2 = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        val controls3 = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
+        // Quick phone controls
+        val controlHeading = sectionTitle("SMART MOBILE CONTROL")
+        val controls1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val controls2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val controls3 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
-        addControl(controls1, "Wi-Fi") {
-            openSettings(Settings.ACTION_WIFI_SETTINGS)
-        }
-        addControl(controls1, "Bluetooth") {
-            openSettings(Settings.ACTION_BLUETOOTH_SETTINGS)
-        }
-        addControl(controls1, "Flashlight") {
-            toggleFlashlight()
-        }
-
+        addControl(controls1, "Wi-Fi") { openSettings(Settings.ACTION_WIFI_SETTINGS) }
+        addControl(controls1, "Bluetooth") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
+        addControl(controls1, "Flashlight") { toggleFlashlight() }
         addControl(controls2, "Camera") { openCamera() }
-        addControl(controls2, "YouTube") {
-            openUrl("https://www.youtube.com")
-        }
-        addControl(controls2, "Settings") {
-            openSettings(Settings.ACTION_SETTINGS)
-        }
-
-        addControl(controls3, "Facebook") {
-            openUrl("https://www.facebook.com")
-        }
+        addControl(controls2, "YouTube") { openUrl("https://www.youtube.com") }
+        addControl(controls2, "Settings") { openSettings(Settings.ACTION_SETTINGS) }
+        addControl(controls3, "Facebook") { openUrl("https://www.facebook.com") }
         addControl(controls3, "Gallery") { openGallery() }
-        addControl(controls3, "Brightness") {
-            openSettings(Settings.ACTION_DISPLAY_SETTINGS)
-        }
+        addControl(controls3, "Brightness") { openSettings(Settings.ACTION_DISPLAY_SETTINGS) }
 
         root.addView(header)
-        root.addView(statusText)
-        root.addView(orb)
-        root.addView(powerButton)
-        root.addView(sectionTitle("AI CHAT"))
-
-        root.addView(
-            chatScroll,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
+        val heroParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
         )
-
+        heroParams.setMargins(0, dp(8), 0, dp(8))
+        root.addView(hero, heroParams)
+        root.addView(chatHeading)
+        root.addView(chatScroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
         root.addView(inputRow)
-        root.addView(sectionTitle("SMART MOBILE CONTROL"))
+        root.addView(controlHeading)
         root.addView(controls1)
         root.addView(controls2)
         root.addView(controls3)
 
         setContentView(root)
-
         restoreConversation()
         if (conversation.isEmpty()) {
             addMessage(false, "আসসালামু আলাইকুম! আমি বাংলার AI। আমাকে যেকোনো প্রশ্ন করতে পারেন।")
@@ -365,22 +387,24 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val bubble = TextView(this).apply {
             text = (if (isUser) "আপনি: " else "বাংলার AI: ") + message
             textSize = 14f
+            gravity = if (isUser) Gravity.END else Gravity.START
             setTextColor(
                 if (isUser) Color.WHITE else Color.rgb(210, 255, 225)
             )
-            setPadding(dp(11), dp(9), dp(11), dp(9))
+            setPadding(dp(13), dp(10), dp(13), dp(10))
             background = rounded(
-                if (isUser) Color.rgb(24, 68, 48)
+                if (isUser) Color.rgb(0, 112, 70)
                 else Color.rgb(25, 44, 37),
-                12
+                15
             )
         }
 
         val params = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
-        params.setMargins(0, dp(4), 0, dp(4))
+        params.gravity = if (isUser) Gravity.END else Gravity.START
+        params.setMargins(dp(2), dp(5), dp(2), dp(5))
 
         chatLayout.addView(bubble, params)
         chatScroll.post {
@@ -411,7 +435,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (apiKey.isBlank()) {
             addMessage(
                 false,
-                "API Key বসানো হয়নি। কোডের API_KEY জায়গায় আপনার Groq API Key বসান।"
+                "API Key সেট করা হয়নি। সেটিংস থেকে “API Key সেট করুন” অপশনে গিয়ে নতুন Groq API Key সংরক্ষণ করুন।"
             )
             return
         }

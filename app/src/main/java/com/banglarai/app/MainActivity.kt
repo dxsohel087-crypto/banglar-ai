@@ -886,6 +886,22 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         Toast.makeText(this, "ফ্লোটিং AI চালু হয়েছে", Toast.LENGTH_SHORT).show()
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == OVERLAY_PERMISSION) {
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M ||
+                Settings.canDrawOverlays(this)
+            ) {
+                startService(Intent(this, FloatingAssistantService::class.java))
+                getSharedPreferences("banglar_ai", MODE_PRIVATE).edit()
+                    .putBoolean("floating_enabled", true).apply()
+                Toast.makeText(this, "ফ্লোটিং AI চালু হয়েছে", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "ফ্লোটিং AI চালাতে Overlay অনুমতি প্রয়োজন", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     // PERMISSIONS
 
     override fun onRequestPermissionsResult(

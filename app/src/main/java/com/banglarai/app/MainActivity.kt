@@ -38,9 +38,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     companion object {
          private const val OVERLAY_PERMISSION = 401
-        private const val MODEL = "openai/gpt-oss-120b"
-        private const val API_URL =
-            "https://api.groq.com/openai/v1/chat/completions"
+        // Replace with the deployed shared backend URL before public release.
+        private const val AI_BACKEND_URL =
+            "https://YOUR-BANGLAR-AI-WORKER.workers.dev/v1/chat/completions"
 
         private const val MIC_PERMISSION = 101
         private const val CAMERA_PERMISSION = 102
@@ -501,103 +501,51 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // GROQ AI
 
     private fun askGroq() {
-        val apiKey = ApiKeyStore.get(this)
-        if (apiKey.isBlank()) {
-            addMessage(
-                false,
-                "API Key সেট করা হয়নি। সেটিংস থেকে “API Key সেট করুন” অপশনে গিয়ে নতুন Groq API Key সংরক্ষণ করুন।"
-            )
-            return
-        }
-
         busy = true
         statusText.text = "● AI চিন্তা করছে..."
         statusText.setTextColor(Color.YELLOW)
-
         Thread {
             var answer: String
-
+            var connection: HttpURLConnection? = null
             try {
-                val connection =
-                    URL(API_URL).openConnection() as HttpURLConnection
-
+                connection = URL(AI_BACKEND_URL).openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.connectTimeout = 20000
-                connection.readTimeout = 30000
+                connection.readTimeout = 45000
                 connection.doOutput = true
-
-                connection.setRequestProperty(
-                    "Authorization",
-                    "Bearer $apiKey"
-                )
-                connection.setRequestProperty(
-                    "Content-Type",
-                    "application/json"
-                )
-
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                connection.setRequestProperty("Accept", "application/json")
                 val messages = JSONArray()
-
-                messages.put(
-                    JSONObject()
-                        .put("role", "system")
-                        .put(
-                            "content",
-                            "তুমি বাংলার AI। সহজ, পরিষ্কার ও স্বাভাবিক বাংলায় উত্তর দেবে। " +
-                                "প্রশ্ন অনুযায়ী প্রয়োজনীয় তথ্য বুঝিয়ে বলবে।"
-                        )
-                )
-
+                messages.put(JSONObject().put("role", "system").put("content",
+                    "তুমি বাংলার AI। সহজ, পরিষ্কার ও স্বাভাবিক বাংলায় উত্তর দেবে। প্রশ্ন অনুযায়ী প্রয়োজনীয় তথ্য বুঝিয়ে বলবে।"))
                 for (item in conversation.takeLast(16)) {
-                    messages.put(
-                        JSONObject()
-                            .put("role", item.first)
-                            .put("content", item.second)
-                    )
+                    messages.put(JSONObject().put("role", item.first).put("content", item.second))
                 }
-
-                val body = JSONObject()
-                    .put("model", MODEL)
-                    .put("messages", messages)
-                    .put("max_completion_tokens", 1200)
-
-                connection.outputStream.use { output ->
-                    output.write(body.toString().toByteArray(Charsets.UTF_8))
-                }
-
+                val body = JSONObject().put("messages", messages)
+                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
                 val code = connection.responseCode
-
                 val response = if (code in 200..299) {
-                    connection.inputStream.bufferedReader().use {
-                        it.readText()
-                    }
+                    connection.inputStream.bufferedReader().use { it.readText() }
                 } else {
-                    connection.errorStream?.bufferedReader()?.use {
-                        it.readText()
-                    } ?: "HTTP $code"
+                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                 }
-
-                if (code in 200..299) {
-                    val json = JSONObject(response)
-                    answer = json.getJSONArray("choices")
-                        .getJSONObject(0)
-                        .getJSONObject("message")
-                        .getString("content")
-                        .trim()
-                } else {
-                    answer = "সার্ভার সমস্যা ($code)। API Key বা মডেল পরীক্ষা করুন।"
+                answer = if (code in 200..299) {
+                    JSONObject(response).getJSONArray("choices").getJSONObject(0)
+                        .getJSONObject("message").getString("content").trim()
+                } else when (code) {
+                    401, 403 -> "AI সার্ভারের অনুমোদন সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।"
+                    429 -> "এখন অনেক ব্যবহারকারী AI ব্যবহার করছেন। একটু পরে আবার চেষ্টা করুন।"
+                    else -> "AI সার্ভারে সমস্যা হয়েছে ($code)। কিছুক্ষণ পরে আবার চেষ্টা করুন।"
                 }
-
-                connection.disconnect()
-
-            } catch (e: Exception) {
-                answer = "AI সার্ভারে সংযোগ করা যায়নি। ইন্টারনেট পরীক্ষা করুন।"
+            } catch (_: Exception) {
+                answer = "বাংলার AI সার্ভারে সংযোগ করা যাচ্ছে না। ইন্টারনেট পরীক্ষা করুন।"
+            } finally {
+                connection?.disconnect()
             }
-
             runOnUiThread {
                 busy = false
                 statusText.text = "● AI প্রস্তুত"
                 statusText.setTextColor(green)
-
                 addMessage(false, answer)
                 conversation.add(Pair("assistant", answer))
                 saveConversation()
@@ -877,8 +825,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val options = arrayOf(
             "চ্যাট মুছে ফেলুন",
             "ভয়েস চালু / বন্ধ",
-            "API Key সেট করুন",
             "ফ্লোটিং AI চালু / বন্ধ",
+            "Accessibility অনুমতি",
             "ফোনের Settings"
         )
 
@@ -888,8 +836,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 when (which) {
                     0 -> clearChat()
                     1 -> toggleVoice()
-                    2 -> showApiKeyDialog()
-                    3 -> toggleFloatingAssistant()
+                    2 -> toggleFloatingAssistant()
+                    3 -> openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     4 -> openSettings(Settings.ACTION_SETTINGS)
                 }
             }
@@ -931,31 +879,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun showApiKeyDialog() {
-        val field = EditText(this).apply {
-            hint = "Groq API Key"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            setTextColor(Color.WHITE)
-        }
-        val container = LinearLayout(this).apply {
-            setPadding(dp(20), dp(8), dp(20), dp(4))
-            addView(field)
-        }
-        AlertDialog.Builder(this)
-            .setTitle("API Key সেট করুন")
-            .setMessage("API Key অ্যাপের কোডে রাখা হবে না; এই ডিভাইসে এনক্রিপ্ট করে রাখা হবে।")
-            .setView(container)
-            .setPositiveButton("সংরক্ষণ") { _, _ ->
-                val key = field.text.toString().trim()
-                if (key.isNotEmpty()) {
-                    ApiKeyStore.save(this, key)
-                    Toast.makeText(this, "API Key সংরক্ষণ করা হয়েছে", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("বাতিল", null)
-            .show()
-    }
 
     private fun toggleFloatingAssistant() {
         val prefs = getSharedPreferences("banglar_ai", MODE_PRIVATE)

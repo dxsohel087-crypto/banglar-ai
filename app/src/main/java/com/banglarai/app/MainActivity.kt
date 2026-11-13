@@ -425,7 +425,77 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         addMessage(true, message)
         conversation.add(Pair("user", message))
         saveConversation()
+        if (handleLocalCommand(message)) return
         askGroq()
+    }
+
+    /**
+     * Small, explicit on-device actions. AI chat remains the fallback.
+     * Accessibility actions work only after the user enables the service in Android Settings.
+     */
+    private fun handleLocalCommand(message: String): Boolean {
+        val text = message.trim()
+        val lower = text.lowercase(Locale.ROOT)
+
+        if (lower.contains("youtube") && (lower.contains("সার্চ") || lower.contains("খুঁজে") || lower.contains("search"))) {
+            val query = text.substringAfter("youtube", "")
+                .replace(Regex("(?i)^(এ|তে|\u0020)*"), "")
+                .replace(Regex("(সার্চ করো|সার্চ দাও|খুঁজে দাও|search করে দাও|search)$", RegexOption.IGNORE_CASE), "")
+                .trim()
+            if (query.isNotBlank()) {
+                openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(query))
+                completeLocalAction("YouTube-এ “$query” সার্চ খুলে দিয়েছি।")
+            } else {
+                openUrl("https://www.youtube.com")
+                completeLocalAction("YouTube খুলে দিয়েছি। কী সার্চ করতে চান বলুন।")
+            }
+            return true
+        }
+
+        if (lower.contains("youtube") && (lower.contains("খুলে") || lower.contains("চালু"))) {
+            openUrl("https://www.youtube.com")
+            completeLocalAction("YouTube খুলে দিয়েছি।")
+            return true
+        }
+
+        if ((lower.contains("স্ক্রিনে কী আছে") || lower.contains("পেজে কী আছে") ||
+             lower.contains("পর্দায় কী আছে") || lower.contains("স্ক্রিন পড়ে") ||
+             lower.contains("স্ক্রিন পড়ে")) && lower.contains("বল")) {
+            val visible = BanglarAccessibilityService.readVisibleText()
+            val answer = if (visible.isNullOrBlank()) {
+                "অন্য অ্যাপের স্ক্রিন পড়তে Settings থেকে বাংলার AI Accessibility চালু করুন। তারপর আবার বলুন।"
+            } else {
+                "বর্তমান স্ক্রিনে যে লেখা পড়তে পারছি:\\n" + visible.take(2200)
+            }
+            completeLocalAction(answer)
+            return true
+        }
+
+        if (lower.contains("ক্লিক করো") || lower.contains("চাপ দাও")) {
+            val target = text.substringAfter("স্ক্রিনে", "")
+                .substringBefore("লেখা")
+                .substringBefore("ক্লিক করো")
+                .substringBefore("চাপ দাও")
+                .trim()
+            if (target.isBlank()) {
+                completeLocalAction("কোন লেখাযুক্ত বোতাম বা আইটেমে ক্লিক করব তা বলুন। যেমন: “স্ক্রিনে Shorts লেখা খুঁজে ক্লিক করো।”")
+            } else {
+                val clicked = BanglarAccessibilityService.clickVisibleText(target)
+                completeLocalAction(
+                    if (clicked) "“$target” আইটেমে ক্লিক করেছি।"
+                    else "“$target” লেখা স্ক্রিনে পাওয়া যায়নি, অথবা সেটিতে ক্লিক করা সম্ভব হয়নি।"
+                )
+            }
+            return true
+        }
+        return false
+    }
+
+    private fun completeLocalAction(reply: String) {
+        addMessage(false, reply)
+        conversation.add(Pair("assistant", reply))
+        saveConversation()
+        if (voiceEnabled && ttsReady) speak(reply)
     }
 
     // GROQ AI

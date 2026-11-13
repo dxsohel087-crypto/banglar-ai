@@ -37,9 +37,7 @@ import java.util.Locale
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     companion object {
-        // নিজের Groq API Key এখানে বসাবেন
-        private const val API_KEY = "YOUR_GROQ_API_KEY"
-
+         private const val OVERLAY_PERMISSION = 401
         private const val MODEL = "openai/gpt-oss-120b"
         private const val API_URL =
             "https://api.groq.com/openai/v1/chat/completions"
@@ -299,10 +297,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
         setContentView(root)
 
-        addMessage(
-            false,
-            "আসসালামু আলাইকুম! আমি বাংলার AI। আমাকে যেকোনো প্রশ্ন করতে পারেন।"
-        )
+        restoreConversation()
+        if (conversation.isEmpty()) {
+            addMessage(false, "আসসালামু আলাইকুম! আমি বাংলার AI। আমাকে যেকোনো প্রশ্ন করতে পারেন।")
+        }
     }
 
     // DESIGN HELPERS
@@ -402,13 +400,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         inputBox.setText("")
         addMessage(true, message)
         conversation.add(Pair("user", message))
+        saveConversation()
         askGroq()
     }
 
     // GROQ AI
 
     private fun askGroq() {
-        if (API_KEY == "YOUR_GROQ_API_KEY" || API_KEY.isBlank()) {
+        val apiKey = ApiKeyStore.get(this)
+        if (apiKey.isBlank()) {
             addMessage(
                 false,
                 "API Key বসানো হয়নি। কোডের API_KEY জায়গায় আপনার Groq API Key বসান।"
@@ -434,7 +434,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
                 connection.setRequestProperty(
                     "Authorization",
-                    "Bearer $API_KEY"
+                    "Bearer $apiKey"
                 )
                 connection.setRequestProperty(
                     "Content-Type",
@@ -506,6 +506,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
                 addMessage(false, answer)
                 conversation.add(Pair("assistant", answer))
+                saveConversation()
                 speak(answer)
             }
         }.start()
@@ -782,6 +783,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val options = arrayOf(
             "চ্যাট মুছে ফেলুন",
             "ভয়েস চালু / বন্ধ",
+            "API Key সেট করুন",
+            "ফ্লোটিং AI চালু / বন্ধ",
             "ফোনের Settings"
         )
 
@@ -791,7 +794,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 when (which) {
                     0 -> clearChat()
                     1 -> toggleVoice()
-                    2 -> openSettings(Settings.ACTION_SETTINGS)
+                    2 -> showApiKeyDialog()
+                    3 -> toggleFloatingAssistant()
+                    4 -> openSettings(Settings.ACTION_SETTINGS)
                 }
             }
             .setNegativeButton("বন্ধ", null)
@@ -801,7 +806,84 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun clearChat() {
         chatLayout.removeAllViews()
         conversation.clear()
+        getSharedPreferences("banglar_ai", MODE_PRIVATE).edit().remove("conversation").apply()
         addMessage(false, "চ্যাট মুছে ফেলা হয়েছে। আবার কথা শুরু করুন।")
+    }
+
+    private fun saveConversation() {
+        val array = JSONArray()
+        conversation.takeLast(80).forEach { item ->
+            array.put(JSONObject().put("role", item.first).put("text", item.second))
+        }
+        getSharedPreferences("banglar_ai", MODE_PRIVATE).edit()
+            .putString("conversation", array.toString()).apply()
+    }
+
+    private fun restoreConversation() {
+        val saved = getSharedPreferences("banglar_ai", MODE_PRIVATE)
+            .getString("conversation", null) ?: return
+        try {
+            val array = JSONArray(saved)
+            for (i in 0 until array.length()) {
+                val item = array.getJSONObject(i)
+                val role = item.getString("role")
+                val message = item.getString("text")
+                conversation.add(Pair(role, message))
+                addMessage(role == "user", message)
+            }
+        } catch (_: Exception) {
+            conversation.clear()
+            getSharedPreferences("banglar_ai", MODE_PRIVATE).edit().remove("conversation").apply()
+        }
+    }
+
+    private fun showApiKeyDialog() {
+        val field = EditText(this).apply {
+            hint = "Groq API Key"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setTextColor(Color.WHITE)
+        }
+        val container = LinearLayout(this).apply {
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(field)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("API Key সেট করুন")
+            .setMessage("API Key অ্যাপের কোডে রাখা হবে না; এই ডিভাইসে এনক্রিপ্ট করে রাখা হবে।")
+            .setView(container)
+            .setPositiveButton("সংরক্ষণ") { _, _ ->
+                val key = field.text.toString().trim()
+                if (key.isNotEmpty()) {
+                    ApiKeyStore.save(this, key)
+                    Toast.makeText(this, "API Key সংরক্ষণ করা হয়েছে", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("বাতিল", null)
+            .show()
+    }
+
+    private fun toggleFloatingAssistant() {
+        val prefs = getSharedPreferences("banglar_ai", MODE_PRIVATE)
+        val enabled = prefs.getBoolean("floating_enabled", false)
+        if (enabled) {
+            stopService(Intent(this, FloatingAssistantService::class.java))
+            prefs.edit().putBoolean("floating_enabled", false).apply()
+            Toast.makeText(this, "ফ্লোটিং AI বন্ধ করা হয়েছে", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
+            !Settings.canDrawOverlays(this)
+        ) {
+            startActivityForResult(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")),
+                OVERLAY_PERMISSION
+            )
+            return
+        }
+        startService(Intent(this, FloatingAssistantService::class.java))
+        prefs.edit().putBoolean("floating_enabled", true).apply()
+        Toast.makeText(this, "ফ্লোটিং AI চালু হয়েছে", Toast.LENGTH_SHORT).show()
     }
 
     // PERMISSIONS
@@ -854,6 +936,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         super.onPause()
         stopListening()
         tts?.stop()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (voiceEnabled && !busy) {
+            handler.postDelayed({
+                if (!isFinishing && voiceEnabled && !busy) startListening()
+            }, 500)
+        }
     }
 
     override fun onDestroy() {

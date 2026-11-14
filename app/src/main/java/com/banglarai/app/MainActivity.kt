@@ -46,9 +46,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         private const val CAMERA_PERMISSION = 102
     }
 
-    private val green = Color.rgb(0, 230, 118)
-    private val dark = Color.rgb(5, 13, 12)
-    private val cardColor = Color.rgb(15, 31, 26)
+    private val green = Color.rgb(74, 196, 255)
+    private val dark = Color.rgb(7, 12, 25)
+    private val cardColor = Color.rgb(19, 29, 49)
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var root: LinearLayout
@@ -87,7 +87,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(dp(24), dp(24), dp(24), dp(24))
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(0, 55, 35), dark)
+                intArrayOf(Color.rgb(13, 31, 62), dark)
             )
         }
 
@@ -107,14 +107,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
 
         val subtitle = TextView(this).apply {
-            text = "FUTURISTIC PERSONAL ASSISTANT"
+            text = "YOUR SMART AI COMPANION"
             textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(green)
         }
 
         val version = TextView(this).apply {
-            text = "GROQ AI  •  বাংলা ভয়েস অ্যাসিস্ট্যান্ট"
+            text = "বাংলা • ENGLISH • VOICE • AI"
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(Color.LTGRAY)
@@ -150,13 +150,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.VERTICAL
         }
         val heading = TextView(this).apply {
-            text = "✦ বাংলার AI"
+            text = "✦ BANGLAR AI"
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(green)
         }
         val tagline = TextView(this).apply {
-            text = "আপনার ব্যক্তিগত AI সহকারী"
+            text = "আপনার স্মার্ট AI সঙ্গী"
             textSize = 11f
             setTextColor(Color.LTGRAY)
         }
@@ -175,7 +175,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(8, 48, 34), Color.rgb(12, 27, 23))
+                intArrayOf(Color.rgb(20, 47, 83), Color.rgb(12, 24, 43))
             ).apply { cornerRadius = dp(22).toFloat() }
         }
         val orb = TextView(this).apply {
@@ -185,10 +185,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setTextColor(Color.WHITE)
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(0, 255, 150), Color.rgb(0, 105, 72), Color.rgb(4, 30, 24))
+                intArrayOf(Color.rgb(112, 220, 255), Color.rgb(35, 112, 205), Color.rgb(12, 31, 70))
             ).apply {
                 shape = GradientDrawable.OVAL
-                setStroke(dp(2), Color.rgb(70, 255, 175))
+                setStroke(dp(2), Color.rgb(120, 220, 255))
             }
             elevation = dp(8).toFloat()
         }
@@ -259,9 +259,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             isSingleLine = true
             setPadding(dp(14), 0, dp(8), 0)
             background = GradientDrawable().apply {
-                setColor(Color.rgb(18, 34, 29))
+                setColor(Color.rgb(17, 29, 49))
                 cornerRadius = dp(24).toFloat()
-                setStroke(dp(1), Color.rgb(35, 82, 61))
+                setStroke(dp(1), Color.rgb(49, 91, 143))
             }
         }
         val micButton = makeButton("🎙")
@@ -389,12 +389,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             textSize = 14f
             gravity = if (isUser) Gravity.END else Gravity.START
             setTextColor(
-                if (isUser) Color.WHITE else Color.rgb(210, 255, 225)
+                if (isUser) Color.WHITE else Color.rgb(220, 237, 255)
             )
             setPadding(dp(13), dp(10), dp(13), dp(10))
             background = rounded(
-                if (isUser) Color.rgb(0, 112, 70)
-                else Color.rgb(25, 44, 37),
+                if (isUser) Color.rgb(32, 104, 190)
+                else Color.rgb(24, 39, 64),
                 15
             )
         }
@@ -709,7 +709,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         override fun onReadyForSpeech(params: Bundle?) {
                             listening = true
                             statusText.text = "● শুনছি..."
-                            statusText.setTextColor(Color.rgb(255, 170, 40))
+                            statusText.setTextColor(Color.rgb(255, 190, 90))
                         }
 
                         override fun onBeginningOfSpeech() {}

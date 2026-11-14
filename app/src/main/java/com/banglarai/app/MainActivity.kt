@@ -6,6 +6,10 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraCharacteristics
@@ -46,9 +50,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         private const val CAMERA_PERMISSION = 102
     }
 
-    private val green = Color.rgb(0, 230, 118)
-    private val dark = Color.rgb(5, 13, 12)
-    private val cardColor = Color.rgb(15, 31, 26)
+    private val green = Color.rgb(74, 196, 255)
+    private val dark = Color.rgb(7, 12, 25)
+    private val cardColor = Color.rgb(19, 29, 49)
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var root: LinearLayout
@@ -87,7 +91,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(dp(24), dp(24), dp(24), dp(24))
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(0, 55, 35), dark)
+                intArrayOf(Color.rgb(13, 31, 62), dark)
             )
         }
 
@@ -107,14 +111,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
 
         val subtitle = TextView(this).apply {
-            text = "FUTURISTIC PERSONAL ASSISTANT"
+            text = "YOUR SMART AI COMPANION"
             textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(green)
         }
 
         val version = TextView(this).apply {
-            text = "GROQ AI  •  বাংলা ভয়েস অ্যাসিস্ট্যান্ট"
+            text = "বাংলা • ENGLISH • VOICE • AI"
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(Color.LTGRAY)
@@ -150,13 +154,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.VERTICAL
         }
         val heading = TextView(this).apply {
-            text = "✦ বাংলার AI"
+            text = "✦ BANGLAR AI"
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(green)
         }
         val tagline = TextView(this).apply {
-            text = "আপনার ব্যক্তিগত AI সহকারী"
+            text = "আপনার স্মার্ট AI সঙ্গী"
             textSize = 11f
             setTextColor(Color.LTGRAY)
         }
@@ -166,7 +170,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         settingsButton.textSize = 20f
         settingsButton.setOnClickListener { showSettings() }
         header.addView(brandBlock, LinearLayout.LayoutParams(0, dp(54), 1f))
-        header.addView(settingsButton, LinearLayout.LayoutParams(dp(48), dp(46)))
+        header.addView(settingsButton, LinearLayout.LayoutParams(dp(46), dp(46)))
 
         // Futuristic AI hero card
         val hero = LinearLayout(this).apply {
@@ -227,7 +231,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         val chatTitle = sectionTitle("AI CHAT")
         val online = TextView(this).apply {
-            text = "● LIVE"
+            text = "● READY"
             textSize = 10f
             setTextColor(green)
             gravity = Gravity.CENTER_VERTICAL
@@ -259,9 +263,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             isSingleLine = true
             setPadding(dp(14), 0, dp(8), 0)
             background = GradientDrawable().apply {
-                setColor(Color.rgb(18, 34, 29))
+                setColor(Color.rgb(17, 29, 49))
                 cornerRadius = dp(24).toFloat()
-                setStroke(dp(1), Color.rgb(35, 82, 61))
+                setStroke(dp(1), Color.rgb(49, 91, 143))
             }
         }
         val micButton = makeButton("🎙")
@@ -389,12 +393,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             textSize = 14f
             gravity = if (isUser) Gravity.END else Gravity.START
             setTextColor(
-                if (isUser) Color.WHITE else Color.rgb(210, 255, 225)
+                if (isUser) Color.WHITE else Color.rgb(220, 237, 255)
             )
             setPadding(dp(13), dp(10), dp(13), dp(10))
             background = rounded(
-                if (isUser) Color.rgb(0, 112, 70)
-                else Color.rgb(25, 44, 37),
+                if (isUser) Color.rgb(32, 104, 190)
+                else Color.rgb(24, 39, 64),
                 15
             )
         }
@@ -709,7 +713,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         override fun onReadyForSpeech(params: Bundle?) {
                             listening = true
                             statusText.text = "● শুনছি..."
-                            statusText.setTextColor(Color.rgb(255, 170, 40))
+                            statusText.setTextColor(Color.rgb(255, 190, 90))
                         }
 
                         override fun onBeginningOfSpeech() {}
@@ -763,7 +767,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 )
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             }
 
             recognizer?.startListening(intent)
@@ -879,7 +883,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             "ভয়েস চালু / বন্ধ",
             "API Key সেট করুন",
             "ফ্লোটিং AI চালু / বন্ধ",
-            "ফোনের Settings"
+            "ফোনের Settings",
+            "গোপনীয়তা ও অনুমতি"
         )
 
         AlertDialog.Builder(this)
@@ -891,7 +896,33 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     2 -> showApiKeyDialog()
                     3 -> toggleFloatingAssistant()
                     4 -> openSettings(Settings.ACTION_SETTINGS)
+                    5 -> showPrivacyInfo()
                 }
+            }
+            .setNegativeButton("বন্ধ", null)
+            .show()
+    }
+
+    private fun showPrivacyInfo() {
+        AlertDialog.Builder(this)
+            .setTitle("গোপনীয়তা ও অনুমতি")
+            .setMessage(
+                "আপনার চ্যাটের ইতিহাস এই ডিভাইসের অ্যাপ-প্রাইভেট স্টোরেজে রাখা হয়। " +
+                    "আপনার দেওয়া AI API Key Android Keystore ব্যবহার করে এনক্রিপ্ট করে সংরক্ষণ করা হয়। " +
+                    "AI উত্তর পেতে পাঠানো বার্তা কনফিগার করা AI প্রদানকারীর সার্ভারে যায়।\n\n" +
+                    "মাইক্রোফোন, ক্যামেরা/ফ্ল্যাশলাইট, Floating Assistant এবং Accessibility সুবিধা " +
+                    "ঐচ্ছিক। প্রয়োজন অনুযায়ী Android Settings থেকে অনুমতি বন্ধ করতে পারবেন। " +
+                    "Accessibility ব্যবহারকারীর নির্দেশে দৃশ্যমান লেখা পড়া বা নির্দিষ্ট আইটেমে " +
+                    "ক্লিক করার জন্য; গোপনে স্ক্রিন পর্যবেক্ষণের জন্য নয়।\n\n" +
+                    "এটি উন্নয়নাধীন সংস্করণ। Public release-এর আগে পূর্ণ Privacy Policy প্রকাশ করা হবে।"
+            )
+            .setPositiveButton("অ্যাপের অনুমতি") { _, _ ->
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:$packageName")
+                    )
+                )
             }
             .setNegativeButton("বন্ধ", null)
             .show()

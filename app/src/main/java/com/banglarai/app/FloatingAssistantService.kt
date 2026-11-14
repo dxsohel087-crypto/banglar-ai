@@ -37,11 +37,11 @@ class FloatingAssistantService : Service() {
             text = "বাংলার AI"
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF052018.toInt())
+            setTextColor(0xFF07182D.toInt())
             gravity = Gravity.CENTER
             setPadding(24, 14, 24, 14)
             background = GradientDrawable().apply {
-                setColor(0xFF00E676.toInt())
+                setColor(0xFF4AC4FF.toInt())
                 cornerRadius = 48f
             }
             setOnClickListener {

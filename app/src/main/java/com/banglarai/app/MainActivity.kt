@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
@@ -22,6 +24,8 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -38,9 +42,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     companion object {
          private const val OVERLAY_PERMISSION = 401
-        private const val MODEL = "openai/gpt-oss-120b"
-        private const val API_URL =
-            "https://api.groq.com/openai/v1/chat/completions"
+        // Replace with the deployed shared backend URL before public release.
+        private const val AI_BACKEND_URL =
+            "https://YOUR-BANGLAR-AI-WORKER.workers.dev/v1/chat/completions"
 
         private const val MIC_PERMISSION = 101
         private const val CAMERA_PERMISSION = 102
@@ -52,11 +56,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var root: LinearLayout
+    private lateinit var contentHost: FrameLayout
+    private lateinit var homeBody: LinearLayout
+    private lateinit var chatHeading: LinearLayout
+    private lateinit var inputRow: LinearLayout
+    private var selectedTab = 0
     private lateinit var chatLayout: LinearLayout
     private lateinit var chatScroll: ScrollView
     private lateinit var inputBox: EditText
     private lateinit var statusText: TextView
     private lateinit var powerButton: Button
+    private lateinit var hangupButton: Button
+    private lateinit var aiOrb: TextView
+    private var orbPulse: ObjectAnimator? = null
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -137,6 +149,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun showHome() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setBackgroundColor(dark)
+        }
+        contentHost = FrameLayout(this)
+        homeBody = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(12), dp(16), dp(10))
             setBackgroundColor(dark)
         }
@@ -164,7 +181,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         brandBlock.addView(tagline)
         val settingsButton = makeButton("⚙")
         settingsButton.textSize = 20f
-        settingsButton.setOnClickListener { showSettings() }
+        settingsButton.setOnClickListener { renderTab(4) }
         header.addView(brandBlock, LinearLayout.LayoutParams(0, dp(54), 1f))
         header.addView(settingsButton, LinearLayout.LayoutParams(dp(48), dp(46)))
 
@@ -192,6 +209,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
             elevation = dp(8).toFloat()
         }
+        aiOrb = orb
         val heroTitle = TextView(this).apply {
             text = "আমি আপনার কথা শুনতে প্রস্তুত"
             textSize = 15f
@@ -206,22 +224,36 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTextColor(green)
         }
-        powerButton = makeButton("🎙  AI ভয়েস চালু করুন")
-        powerButton.setTextColor(dark)
-        powerButton.background = rounded(green, 22)
-        powerButton.setOnClickListener { toggleVoice() }
+        powerButton = makeButton("●  কল করুন")
+        powerButton.textSize = 16f
+        powerButton.setTextColor(Color.WHITE)
+        powerButton.background = rounded(Color.rgb(0, 170, 90), 28)
+        powerButton.setOnClickListener { startVoiceCall() }
+        hangupButton = makeButton("■  কল কাটুন")
+        hangupButton.textSize = 16f
+        hangupButton.setTextColor(Color.WHITE)
+        hangupButton.background = rounded(Color.rgb(205, 45, 58), 28)
+        hangupButton.setOnClickListener { endVoiceCall() }
+        updateCallButtons()
 
-        hero.addView(orb, LinearLayout.LayoutParams(dp(88), dp(88)))
+        hero.addView(orb, LinearLayout.LayoutParams(dp(172), dp(172)))
         hero.addView(heroTitle)
         hero.addView(statusText)
-        val powerParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
-        )
-        powerParams.setMargins(dp(18), dp(10), dp(18), dp(2))
-        hero.addView(powerButton, powerParams)
+        val callRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(18), 0, dp(4))
+        }
+        val callParams = LinearLayout.LayoutParams(0, dp(54), 1f)
+        callParams.setMargins(dp(5), 0, dp(5), 0)
+        callRow.addView(powerButton, callParams)
+        val hangupParams = LinearLayout.LayoutParams(0, dp(54), 1f)
+        hangupParams.setMargins(dp(5), 0, dp(5), 0)
+        callRow.addView(hangupButton, hangupParams)
+        hero.addView(callRow)
 
         // Chat panel
-        val chatHeading = LinearLayout(this).apply {
+        chatHeading = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
@@ -246,7 +278,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         chatScroll.addView(chatLayout)
 
         // Message composer
-        val inputRow = LinearLayout(this).apply {
+        inputRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(8), 0, dp(4))
@@ -286,43 +318,218 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         inputRow.addView(micButton, micParams)
         inputRow.addView(sendButton, LinearLayout.LayoutParams(dp(46), dp(46)))
 
-        // Quick phone controls
-        val controlHeading = sectionTitle("SMART MOBILE CONTROL")
-        val controls1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val controls2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val controls3 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-
-        addControl(controls1, "Wi-Fi") { openSettings(Settings.ACTION_WIFI_SETTINGS) }
-        addControl(controls1, "Bluetooth") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
-        addControl(controls1, "Flashlight") { toggleFlashlight() }
-        addControl(controls2, "Camera") { openCamera() }
-        addControl(controls2, "YouTube") { openUrl("https://www.youtube.com") }
-        addControl(controls2, "Settings") { openSettings(Settings.ACTION_SETTINGS) }
-        addControl(controls3, "Facebook") { openUrl("https://www.facebook.com") }
-        addControl(controls3, "Gallery") { openGallery() }
-        addControl(controls3, "Brightness") { openSettings(Settings.ACTION_DISPLAY_SETTINGS) }
-
-        root.addView(header)
+        homeBody.addView(header)
         val heroParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
         )
         heroParams.setMargins(0, dp(8), 0, dp(8))
-        root.addView(hero, heroParams)
-        root.addView(chatHeading)
-        root.addView(chatScroll, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-        root.addView(inputRow)
-        root.addView(controlHeading)
-        root.addView(controls1)
-        root.addView(controls2)
-        root.addView(controls3)
+        homeBody.addView(hero, heroParams)
+        val homeHint = TextView(this).apply {
+            text = "সবকিছু বলুন—আমি শুনছি"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(Color.LTGRAY)
+            setPadding(0, dp(18), 0, dp(8))
+        }
+        homeBody.addView(homeHint)
 
+        contentHost.addView(homeBody, FrameLayout.LayoutParams(-1, -1))
+        root.addView(contentHost, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(createBottomNavigation())
         setContentView(root)
         restoreConversation()
         if (conversation.isEmpty()) {
             addMessage(false, "আসসালামু আলাইকুম! আমি বাংলার AI। আমাকে যেকোনো প্রশ্ন করতে পারেন।")
         }
+    }
+
+    // BOTTOM NAVIGATION AND FULL-PAGE SCREENS
+
+    private fun createBottomNavigation(): LinearLayout {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(5), dp(7), dp(5), dp(7))
+            setBackgroundColor(Color.rgb(9, 23, 19))
+        }
+        val items = listOf("⌂\nহোম", "✉\nচ্যাট", "✧\nস্টোরি", "◷\nইতিহাস", "⚙\nসেটিংস")
+        items.forEachIndexed { index, label ->
+            val button = TextView(this).apply {
+                text = label
+                gravity = Gravity.CENTER
+                textSize = 11f
+                typeface = if (selectedTab == index) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                setTextColor(if (selectedTab == index) green else Color.LTGRAY)
+                setPadding(dp(2), dp(3), dp(2), dp(3))
+                setOnClickListener { renderTab(index) }
+            }
+            bar.addView(button, LinearLayout.LayoutParams(0, dp(52), 1f))
+        }
+        return bar
+    }
+
+    private fun renderTab(index: Int) {
+        selectedTab = index
+        contentHost.removeAllViews()
+        (chatHeading.parent as? ViewGroup)?.removeView(chatHeading)
+        (chatScroll.parent as? ViewGroup)?.removeView(chatScroll)
+        (inputRow.parent as? ViewGroup)?.removeView(inputRow)
+        when (index) {
+            0 -> contentHost.addView(homeBody, FrameLayout.LayoutParams(-1, -1))
+            1 -> {
+                val page = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(14), dp(12), dp(14), dp(8))
+                    setBackgroundColor(dark)
+                }
+                page.addView(chatHeading)
+                page.addView(chatScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+                page.addView(inputRow)
+                contentHost.addView(page, FrameLayout.LayoutParams(-1, -1))
+            }
+            2 -> contentHost.addView(buildStoryPage(), FrameLayout.LayoutParams(-1, -1))
+            3 -> contentHost.addView(buildHistoryPage(), FrameLayout.LayoutParams(-1, -1))
+            4 -> contentHost.addView(buildSettingsPage(), FrameLayout.LayoutParams(-1, -1))
+        }
+        if (root.childCount > 1) root.removeViewAt(root.childCount - 1)
+        root.addView(createBottomNavigation())
+    }
+
+    private fun pageShell(title: String, subtitle: String): LinearLayout {
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            setBackgroundColor(dark)
+        }
+        page.addView(TextView(this).apply {
+            text = title
+            textSize = 25f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(green)
+        })
+        page.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 13f
+            setTextColor(Color.LTGRAY)
+            setPadding(0, dp(5), 0, dp(16))
+        })
+        return page
+    }
+
+    private fun pageAction(parent: LinearLayout, title: String, detail: String, action: () -> Unit) {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), dp(13), dp(15), dp(13))
+            background = rounded(cardColor, 16)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
+        }
+        card.addView(TextView(this).apply {
+            text = title
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+        })
+        card.addView(TextView(this).apply {
+            text = detail
+            textSize = 12f
+            setTextColor(Color.LTGRAY)
+            setPadding(0, dp(4), 0, 0)
+        })
+        val params = LinearLayout.LayoutParams(-1, -2)
+        params.setMargins(0, 0, 0, dp(10))
+        parent.addView(card, params)
+    }
+
+    private fun buildStoryPage(): View {
+        val page = pageShell("স্টোরি", "বাংলার AI-এর সঙ্গে তৈরি করা গল্প ও লেখার জায়গা।")
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pageAction(list, "✍ নতুন গল্প লিখুন", "চ্যাটে গিয়ে গল্পের বিষয় বলুন; AI গল্প তৈরি করবে।") { renderTab(1) }
+        pageAction(list, "💬 AI চ্যাট খুলুন", "আপনার গল্পের ধারণা বা চরিত্র নিয়ে কথা বলুন।") { renderTab(1) }
+        page.addView(list, LinearLayout.LayoutParams(-1, -1))
+        return page
+    }
+
+    private fun buildToolsPage(): View {
+        val page = pageShell("স্মার্ট টুলস", "ফোনের কাজগুলো প্রয়োজন অনুযায়ী খুলুন।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pageAction(list, "🔦 ফ্ল্যাশলাইট", "ফোনের ফ্ল্যাশ চালু বা বন্ধ করুন।") { toggleFlashlight() }
+        pageAction(list, "📷 ক্যামেরা", "ক্যামেরা খুলুন।") { openCamera() }
+        pageAction(list, "🖼 গ্যালারি ও ফাইল", "ছবি বা ডকুমেন্ট নির্বাচন করুন।") { openGallery() }
+        pageAction(list, "📶 Wi-Fi সেটিংস", "ফোনের Wi-Fi পেজ খুলুন।") { openSettings(Settings.ACTION_WIFI_SETTINGS) }
+        pageAction(list, "Bluetooth সেটিংস", "Bluetooth সংযোগের পেজ খুলুন।") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
+        pageAction(list, "▶ YouTube", "YouTube খুলুন।") { openUrl("https://www.youtube.com") }
+        pageAction(list, "Facebook", "Facebook খুলুন।") { openUrl("https://www.facebook.com") }
+        pageAction(list, "☀ ডিসপ্লে", "Brightness ও display সেটিংস খুলুন।") { openSettings(Settings.ACTION_DISPLAY_SETTINGS) }
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
+    }
+
+    private fun buildHistoryPage(): View {
+        val page = pageShell("চ্যাটের ইতিহাস", "এই ডিভাইসে সংরক্ষিত সাম্প্রতিক কথোপকথন।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        if (conversation.isEmpty()) {
+            pageAction(list, "এখনো কোনো ইতিহাস নেই", "AI-এর সঙ্গে কথা বললে এখানে দেখা যাবে।") { renderTab(1) }
+        } else {
+            conversation.takeLast(80).forEach { item ->
+                pageAction(list, if (item.first == "user") "আপনি" else "বাংলার AI", item.second) { renderTab(1) }
+            }
+            pageAction(list, "ইতিহাস মুছুন", "এই ডিভাইসে সংরক্ষিত কথোপকথন মুছে যাবে।") {
+                clearChat()
+                renderTab(3)
+            }
+        }
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
+    }
+
+    private fun buildSettingsPage(): View {
+        val page = pageShell("সেটিংস", "প্রতিটি অনুমতির কাজ বুঝে তারপর চালু করুন। API Key এখানে লাগবে না।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pageAction(list, "🎙 মাইক্রোফোন অনুমতি", "ভয়েসে কথা বলা ও Speech Recognition-এর জন্য।") {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_PERMISSION)
+            } else Toast.makeText(this, "মাইক্রোফোন অনুমতি চালু আছে", Toast.LENGTH_SHORT).show()
+        }
+        pageAction(list, "📷 ক্যামেরা অনুমতি", "ক্যামেরা-সম্পর্কিত ফিচারের জন্য।") {
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION)
+            } else openCamera()
+        }
+        pageAction(list, "🪟 Floating AI অনুমতি", "অন্য অ্যাপের ওপর ছোট AI বাটন দেখানোর জন্য।") {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            } else toggleFloatingAssistant()
+        }
+        pageAction(list, "♿ Accessibility", "স্ক্রিনের দৃশ্যমান লেখা পড়া বা সহায়ক কাজের জন্য। প্রয়োজন না হলে চালু করবেন না।") {
+            openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        }
+        pageAction(list, "🔔 নোটিফিকেশন অনুমতি", "বাংলার AI-এর নিজের নোটিফিকেশনের জন্য; অন্য অ্যাপের নোটিফিকেশন পড়ার অনুমতি নয়।") {
+            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 203)
+            } else Toast.makeText(this, "নোটিফিকেশন অনুমতি চালু আছে অথবা আলাদা অনুমতি প্রয়োজন নেই", Toast.LENGTH_LONG).show()
+        }
+        pageAction(list, "📁 ফাইল ও ছবি নির্বাচন", "Android-এর নিরাপদ File Picker খুলবে; প্রয়োজনের ফাইল নিজে নির্বাচন করুন।") { openGallery() }
+        pageAction(list, "🛡 গোপনীয়তা", "চ্যাটের ইতিহাস এই ডিভাইসে থাকে; AI উত্তর পেতে প্রশ্ন Backend-এ পাঠানো হয়।") {
+            AlertDialog.Builder(this).setTitle("গোপনীয়তা")
+                .setMessage("আপনার লেখা প্রশ্ন AI উত্তর তৈরির জন্য বাংলার AI Backend-এ পাঠানো হয়। API Key অ্যাপের মধ্যে রাখা হয় না। চ্যাটের ইতিহাস এই ডিভাইসের অ্যাপ ডেটায় থাকে।")
+                .setPositiveButton("ঠিক আছে", null).show()
+        }
+        pageAction(list, "ℹ অ্যাপ সম্পর্কে", "বাংলার AI • বাংলা ভাষার ব্যক্তিগত সহকারী") {
+            AlertDialog.Builder(this).setTitle("বাংলার AI")
+                .setMessage("বাংলার AI একটি বাংলা ভয়েস ও চ্যাট সহকারী। কিছু ফিচার চালাতে ইন্টারনেট ও Android অনুমতি প্রয়োজন।")
+                .setPositiveButton("বন্ধ", null).show()
+        }
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
     }
 
     // DESIGN HELPERS
@@ -501,103 +708,51 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // GROQ AI
 
     private fun askGroq() {
-        val apiKey = ApiKeyStore.get(this)
-        if (apiKey.isBlank()) {
-            addMessage(
-                false,
-                "API Key সেট করা হয়নি। সেটিংস থেকে “API Key সেট করুন” অপশনে গিয়ে নতুন Groq API Key সংরক্ষণ করুন।"
-            )
-            return
-        }
-
         busy = true
         statusText.text = "● AI চিন্তা করছে..."
         statusText.setTextColor(Color.YELLOW)
-
         Thread {
             var answer: String
-
+            var connection: HttpURLConnection? = null
             try {
-                val connection =
-                    URL(API_URL).openConnection() as HttpURLConnection
-
+                connection = URL(AI_BACKEND_URL).openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.connectTimeout = 20000
-                connection.readTimeout = 30000
+                connection.readTimeout = 45000
                 connection.doOutput = true
-
-                connection.setRequestProperty(
-                    "Authorization",
-                    "Bearer $apiKey"
-                )
-                connection.setRequestProperty(
-                    "Content-Type",
-                    "application/json"
-                )
-
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                connection.setRequestProperty("Accept", "application/json")
                 val messages = JSONArray()
-
-                messages.put(
-                    JSONObject()
-                        .put("role", "system")
-                        .put(
-                            "content",
-                            "তুমি বাংলার AI। সহজ, পরিষ্কার ও স্বাভাবিক বাংলায় উত্তর দেবে। " +
-                                "প্রশ্ন অনুযায়ী প্রয়োজনীয় তথ্য বুঝিয়ে বলবে।"
-                        )
-                )
-
+                messages.put(JSONObject().put("role", "system").put("content",
+                    "তুমি বাংলার AI। সহজ, পরিষ্কার ও স্বাভাবিক বাংলায় উত্তর দেবে। প্রশ্ন অনুযায়ী প্রয়োজনীয় তথ্য বুঝিয়ে বলবে।"))
                 for (item in conversation.takeLast(16)) {
-                    messages.put(
-                        JSONObject()
-                            .put("role", item.first)
-                            .put("content", item.second)
-                    )
+                    messages.put(JSONObject().put("role", item.first).put("content", item.second))
                 }
-
-                val body = JSONObject()
-                    .put("model", MODEL)
-                    .put("messages", messages)
-                    .put("max_completion_tokens", 1200)
-
-                connection.outputStream.use { output ->
-                    output.write(body.toString().toByteArray(Charsets.UTF_8))
-                }
-
+                val body = JSONObject().put("messages", messages)
+                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
                 val code = connection.responseCode
-
                 val response = if (code in 200..299) {
-                    connection.inputStream.bufferedReader().use {
-                        it.readText()
-                    }
+                    connection.inputStream.bufferedReader().use { it.readText() }
                 } else {
-                    connection.errorStream?.bufferedReader()?.use {
-                        it.readText()
-                    } ?: "HTTP $code"
+                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                 }
-
-                if (code in 200..299) {
-                    val json = JSONObject(response)
-                    answer = json.getJSONArray("choices")
-                        .getJSONObject(0)
-                        .getJSONObject("message")
-                        .getString("content")
-                        .trim()
-                } else {
-                    answer = "সার্ভার সমস্যা ($code)। API Key বা মডেল পরীক্ষা করুন।"
+                answer = if (code in 200..299) {
+                    JSONObject(response).getJSONArray("choices").getJSONObject(0)
+                        .getJSONObject("message").getString("content").trim()
+                } else when (code) {
+                    401, 403 -> "AI সার্ভারের অনুমোদন সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।"
+                    429 -> "এখন অনেক ব্যবহারকারী AI ব্যবহার করছেন। একটু পরে আবার চেষ্টা করুন।"
+                    else -> "AI সার্ভারে সমস্যা হয়েছে ($code)। কিছুক্ষণ পরে আবার চেষ্টা করুন।"
                 }
-
-                connection.disconnect()
-
-            } catch (e: Exception) {
-                answer = "AI সার্ভারে সংযোগ করা যায়নি। ইন্টারনেট পরীক্ষা করুন।"
+            } catch (_: Exception) {
+                answer = "বাংলার AI সার্ভারে সংযোগ করা যাচ্ছে না। ইন্টারনেট পরীক্ষা করুন।"
+            } finally {
+                connection?.disconnect()
             }
-
             runOnUiThread {
                 busy = false
                 statusText.text = "● AI প্রস্তুত"
                 statusText.setTextColor(green)
-
                 addMessage(false, answer)
                 conversation.add(Pair("assistant", answer))
                 saveConversation()
@@ -627,10 +782,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
             tts?.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {}
+                    override fun onStart(utteranceId: String?) {
+                handler.post { startOrbAnimation() }
+            }
 
                     override fun onDone(utteranceId: String?) {
                         handler.post {
+                            stopOrbAnimation()
                             if (voiceEnabled && !busy) {
                                 handler.postDelayed({
                                     startListening()
@@ -660,18 +818,50 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // VOICE INPUT
 
     private fun toggleVoice() {
-        voiceEnabled = !voiceEnabled
+        if (voiceEnabled) endVoiceCall() else startVoiceCall()
+    }
 
-        if (voiceEnabled) {
-            powerButton.text = "AI বন্ধ করুন"
-            statusText.text = "● ভয়েস চালু"
-            checkMicPermissionAndListen()
-        } else {
-            powerButton.text = "AI চালু করুন"
-            statusText.text = "● AI প্রস্তুত"
-            stopListening()
-            tts?.stop()
+    private fun startVoiceCall() {
+        if (voiceEnabled) return
+        voiceEnabled = true
+        statusText.text = "● কল সংযোগ হচ্ছে..."
+        statusText.setTextColor(Color.rgb(0, 220, 130))
+        updateCallButtons()
+        checkMicPermissionAndListen()
+    }
+
+    private fun endVoiceCall() {
+        voiceEnabled = false
+        stopListening()
+        tts?.stop()
+        stopOrbAnimation()
+        statusText.text = "● কল শেষ হয়েছে"
+        statusText.setTextColor(Color.LTGRAY)
+        updateCallButtons()
+    }
+
+    private fun updateCallButtons() {
+        if (!::powerButton.isInitialized || !::hangupButton.isInitialized) return
+        powerButton.isEnabled = !voiceEnabled
+        hangupButton.isEnabled = voiceEnabled
+        powerButton.alpha = if (voiceEnabled) 0.45f else 1f
+        hangupButton.alpha = if (voiceEnabled) 1f else 0.45f
+    }
+
+    private fun startOrbAnimation() {
+        if (!::aiOrb.isInitialized || orbPulse?.isRunning == true) return
+        orbPulse = ObjectAnimator.ofFloat(aiOrb, "rotation", -4f, 4f, -4f).apply {
+            duration = 1800
+            repeatCount = ValueAnimator.INFINITE
+            start()
         }
+        aiOrb.animate().scaleX(1.08f).scaleY(1.08f).setDuration(700).start()
+    }
+
+    private fun stopOrbAnimation() {
+        orbPulse?.cancel()
+        orbPulse = null
+        if (::aiOrb.isInitialized) aiOrb.animate().rotation(0f).scaleX(1f).scaleY(1f).setDuration(350).start()
     }
 
     private fun checkMicPermissionAndListen() {
@@ -818,8 +1008,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun openGallery() {
         try {
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                type = "image/*"
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "*/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "application/pdf", "text/plain"))
             }
             startActivityForResult(intent, 300)
         } catch (_: Exception) {
@@ -873,29 +1065,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     // SETTINGS AND CLEAR CHAT
 
-    private fun showSettings() {
-        val options = arrayOf(
-            "চ্যাট মুছে ফেলুন",
-            "ভয়েস চালু / বন্ধ",
-            "API Key সেট করুন",
-            "ফ্লোটিং AI চালু / বন্ধ",
-            "ফোনের Settings"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("বাংলার AI সেটিংস")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> clearChat()
-                    1 -> toggleVoice()
-                    2 -> showApiKeyDialog()
-                    3 -> toggleFloatingAssistant()
-                    4 -> openSettings(Settings.ACTION_SETTINGS)
-                }
-            }
-            .setNegativeButton("বন্ধ", null)
-            .show()
-    }
+    private fun showSettings() { renderTab(4) }
 
     private fun clearChat() {
         chatLayout.removeAllViews()
@@ -931,31 +1101,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun showApiKeyDialog() {
-        val field = EditText(this).apply {
-            hint = "Groq API Key"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            setTextColor(Color.WHITE)
-        }
-        val container = LinearLayout(this).apply {
-            setPadding(dp(20), dp(8), dp(20), dp(4))
-            addView(field)
-        }
-        AlertDialog.Builder(this)
-            .setTitle("API Key সেট করুন")
-            .setMessage("API Key অ্যাপের কোডে রাখা হবে না; এই ডিভাইসে এনক্রিপ্ট করে রাখা হবে।")
-            .setView(container)
-            .setPositiveButton("সংরক্ষণ") { _, _ ->
-                val key = field.text.toString().trim()
-                if (key.isNotEmpty()) {
-                    ApiKeyStore.save(this, key)
-                    Toast.makeText(this, "API Key সংরক্ষণ করা হয়েছে", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("বাতিল", null)
-            .show()
-    }
 
     private fun toggleFloatingAssistant() {
         val prefs = getSharedPreferences("banglar_ai", MODE_PRIVATE)
@@ -1016,7 +1161,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 startListening()
             } else {
                 voiceEnabled = false
-                powerButton.text = "AI চালু করুন"
+                updateCallButtons()
                 Toast.makeText(
                     this,
                     "মাইক্রোফোন অনুমতি প্রয়োজন",

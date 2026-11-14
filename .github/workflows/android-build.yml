@@ -2,7 +2,7 @@ name: Banglar AI APK Build
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'feature/**']
   workflow_dispatch:
 
 permissions:

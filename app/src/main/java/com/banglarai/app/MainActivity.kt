@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
@@ -64,6 +66,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var inputBox: EditText
     private lateinit var statusText: TextView
     private lateinit var powerButton: Button
+    private lateinit var hangupButton: Button
+    private lateinit var aiOrb: TextView
+    private var orbPulse: ObjectAnimator? = null
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -204,6 +209,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
             elevation = dp(8).toFloat()
         }
+        aiOrb = orb
         val heroTitle = TextView(this).apply {
             text = "আমি আপনার কথা শুনতে প্রস্তুত"
             textSize = 15f
@@ -218,19 +224,33 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTextColor(green)
         }
-        powerButton = makeButton("🎙  AI ভয়েস চালু করুন")
-        powerButton.setTextColor(dark)
-        powerButton.background = rounded(green, 22)
-        powerButton.setOnClickListener { toggleVoice() }
+        powerButton = makeButton("●  কল করুন")
+        powerButton.textSize = 16f
+        powerButton.setTextColor(Color.WHITE)
+        powerButton.background = rounded(Color.rgb(0, 170, 90), 28)
+        powerButton.setOnClickListener { startVoiceCall() }
+        hangupButton = makeButton("■  কল কাটুন")
+        hangupButton.textSize = 16f
+        hangupButton.setTextColor(Color.WHITE)
+        hangupButton.background = rounded(Color.rgb(205, 45, 58), 28)
+        hangupButton.setOnClickListener { endVoiceCall() }
+        updateCallButtons()
 
-        hero.addView(orb, LinearLayout.LayoutParams(dp(88), dp(88)))
+        hero.addView(orb, LinearLayout.LayoutParams(dp(172), dp(172)))
         hero.addView(heroTitle)
         hero.addView(statusText)
-        val powerParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
-        )
-        powerParams.setMargins(dp(18), dp(10), dp(18), dp(2))
-        hero.addView(powerButton, powerParams)
+        val callRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(18), 0, dp(4))
+        }
+        val callParams = LinearLayout.LayoutParams(0, dp(54), 1f)
+        callParams.setMargins(dp(5), 0, dp(5), 0)
+        callRow.addView(powerButton, callParams)
+        val hangupParams = LinearLayout.LayoutParams(0, dp(54), 1f)
+        hangupParams.setMargins(dp(5), 0, dp(5), 0)
+        callRow.addView(hangupButton, hangupParams)
+        hero.addView(callRow)
 
         // Chat panel
         chatHeading = LinearLayout(this).apply {
@@ -298,32 +318,20 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         inputRow.addView(micButton, micParams)
         inputRow.addView(sendButton, LinearLayout.LayoutParams(dp(46), dp(46)))
 
-        // Quick phone controls
-        val controlHeading = sectionTitle("SMART MOBILE CONTROL")
-        val controls1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val controls2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val controls3 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-
-        addControl(controls1, "Wi-Fi") { openSettings(Settings.ACTION_WIFI_SETTINGS) }
-        addControl(controls1, "Bluetooth") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
-        addControl(controls1, "Flashlight") { toggleFlashlight() }
-        addControl(controls2, "Camera") { openCamera() }
-        addControl(controls2, "YouTube") { openUrl("https://www.youtube.com") }
-        addControl(controls2, "Settings") { openSettings(Settings.ACTION_SETTINGS) }
-        addControl(controls3, "Facebook") { openUrl("https://www.facebook.com") }
-        addControl(controls3, "Gallery") { openGallery() }
-        addControl(controls3, "Brightness") { openSettings(Settings.ACTION_DISPLAY_SETTINGS) }
-
         homeBody.addView(header)
         val heroParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
         )
         heroParams.setMargins(0, dp(8), 0, dp(8))
         homeBody.addView(hero, heroParams)
-        homeBody.addView(controlHeading)
-        homeBody.addView(controls1)
-        homeBody.addView(controls2)
-        homeBody.addView(controls3)
+        val homeHint = TextView(this).apply {
+            text = "সবকিছু বলুন—আমি শুনছি"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(Color.LTGRAY)
+            setPadding(0, dp(18), 0, dp(8))
+        }
+        homeBody.addView(homeHint)
 
         contentHost.addView(homeBody, FrameLayout.LayoutParams(-1, -1))
         root.addView(contentHost, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -379,7 +387,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 page.addView(inputRow)
                 contentHost.addView(page, FrameLayout.LayoutParams(-1, -1))
             }
-            2 -> contentHost.addView(buildToolsPage(), FrameLayout.LayoutParams(-1, -1))
+            2 -> contentHost.addView(buildStoryPage(), FrameLayout.LayoutParams(-1, -1))
             3 -> contentHost.addView(buildHistoryPage(), FrameLayout.LayoutParams(-1, -1))
             4 -> contentHost.addView(buildSettingsPage(), FrameLayout.LayoutParams(-1, -1))
         }
@@ -432,6 +440,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val params = LinearLayout.LayoutParams(-1, -2)
         params.setMargins(0, 0, 0, dp(10))
         parent.addView(card, params)
+    }
+
+    private fun buildStoryPage(): View {
+        val page = pageShell("স্টোরি", "বাংলার AI-এর সঙ্গে তৈরি করা গল্প ও লেখার জায়গা।")
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pageAction(list, "✍ নতুন গল্প লিখুন", "চ্যাটে গিয়ে গল্পের বিষয় বলুন; AI গল্প তৈরি করবে।") { renderTab(1) }
+        pageAction(list, "💬 AI চ্যাট খুলুন", "আপনার গল্পের ধারণা বা চরিত্র নিয়ে কথা বলুন।") { renderTab(1) }
+        page.addView(list, LinearLayout.LayoutParams(-1, -1))
+        return page
     }
 
     private fun buildToolsPage(): View {
@@ -765,10 +782,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
             tts?.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {}
+                    override fun onStart(utteranceId: String?) {
+                handler.post { startOrbAnimation() }
+            }
 
                     override fun onDone(utteranceId: String?) {
                         handler.post {
+                            stopOrbAnimation()
                             if (voiceEnabled && !busy) {
                                 handler.postDelayed({
                                     startListening()
@@ -798,18 +818,50 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // VOICE INPUT
 
     private fun toggleVoice() {
-        voiceEnabled = !voiceEnabled
+        if (voiceEnabled) endVoiceCall() else startVoiceCall()
+    }
 
-        if (voiceEnabled) {
-            powerButton.text = "AI বন্ধ করুন"
-            statusText.text = "● ভয়েস চালু"
-            checkMicPermissionAndListen()
-        } else {
-            powerButton.text = "AI চালু করুন"
-            statusText.text = "● AI প্রস্তুত"
-            stopListening()
-            tts?.stop()
+    private fun startVoiceCall() {
+        if (voiceEnabled) return
+        voiceEnabled = true
+        statusText.text = "● কল সংযোগ হচ্ছে..."
+        statusText.setTextColor(Color.rgb(0, 220, 130))
+        updateCallButtons()
+        checkMicPermissionAndListen()
+    }
+
+    private fun endVoiceCall() {
+        voiceEnabled = false
+        stopListening()
+        tts?.stop()
+        stopOrbAnimation()
+        statusText.text = "● কল শেষ হয়েছে"
+        statusText.setTextColor(Color.LTGRAY)
+        updateCallButtons()
+    }
+
+    private fun updateCallButtons() {
+        if (!::powerButton.isInitialized || !::hangupButton.isInitialized) return
+        powerButton.isEnabled = !voiceEnabled
+        hangupButton.isEnabled = voiceEnabled
+        powerButton.alpha = if (voiceEnabled) 0.45f else 1f
+        hangupButton.alpha = if (voiceEnabled) 1f else 0.45f
+    }
+
+    private fun startOrbAnimation() {
+        if (!::aiOrb.isInitialized || orbPulse?.isRunning == true) return
+        orbPulse = ObjectAnimator.ofFloat(aiOrb, "rotation", -4f, 4f, -4f).apply {
+            duration = 1800
+            repeatCount = ValueAnimator.INFINITE
+            start()
         }
+        aiOrb.animate().scaleX(1.08f).scaleY(1.08f).setDuration(700).start()
+    }
+
+    private fun stopOrbAnimation() {
+        orbPulse?.cancel()
+        orbPulse = null
+        if (::aiOrb.isInitialized) aiOrb.animate().rotation(0f).scaleX(1f).scaleY(1f).setDuration(350).start()
     }
 
     private fun checkMicPermissionAndListen() {

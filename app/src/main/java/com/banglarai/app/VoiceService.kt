@@ -17,7 +17,7 @@ class VoiceService : Service() {
     companion object {
         const val ACTION_START = "com.banglarai.app.action.START_VOICE_SERVICE"
         const val ACTION_STOP = "com.banglarai.app.action.STOP_VOICE_SERVICE"
-        private const val CHANNEL_ID = "banglar_ai_voice"
+        private const val CHANNEL_ID = "nexvio_voice"
         private const val NOTIFICATION_ID = 2101
     }
 
@@ -26,10 +26,10 @@ class VoiceService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "বাংলার AI ভয়েস",
+                "NEXVIO ভয়েস",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "বাংলার AI ভয়েস সার্ভিসের নোটিফিকেশন"
+                description = "NEXVIO ভয়েস সার্ভিসের নোটিফিকেশন"
             }
             getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(channel)
@@ -45,7 +45,7 @@ class VoiceService : Service() {
         val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-                .setContentTitle("বাংলার AI")
+                .setContentTitle("NEXVIO")
                 .setContentText("ভয়েস সার্ভিস প্রস্তুত")
                 .setOngoing(true)
                 .build()
@@ -53,7 +53,7 @@ class VoiceService : Service() {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-                .setContentTitle("বাংলার AI")
+                .setContentTitle("NEXVIO")
                 .setContentText("ভয়েস সার্ভিস প্রস্তুত")
                 .setOngoing(true)
                 .build()

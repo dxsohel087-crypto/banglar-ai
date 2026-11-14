@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BanglarAI"
+rootProject.name = "NEXVIO"
 include(":app")

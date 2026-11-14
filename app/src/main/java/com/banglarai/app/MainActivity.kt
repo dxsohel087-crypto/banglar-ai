@@ -901,7 +901,15 @@ private fun buildSettingsPage(): View {
         addMessage(false, reply)
         conversation.add(Pair("assistant", reply))
         saveConversation()
-        if (voiceEnabled && ttsReady) speak(reply)
+        if (voiceEnabled) {
+            if (ttsReady) {
+                speak(reply)
+            } else {
+                handler.postDelayed({
+                    if (voiceEnabled && !busy) startListening()
+                }, 650)
+            }
+        }
     }
 
     // TEXT TO SPEECH

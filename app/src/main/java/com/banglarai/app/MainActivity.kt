@@ -61,7 +61,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var inputBox: EditText
     private lateinit var statusText: TextView
     private lateinit var powerButton: Button
-    private lateinit var avatarView: AnimatedAvatarView
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -167,14 +166,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         brandBlock.addView(heading)
         brandBlock.addView(tagline)
-        val storyButton = makeButton("📖 গল্প")
-        storyButton.textSize = 12f
-        storyButton.setOnClickListener { showStoryScreen() }
         val settingsButton = makeButton("⚙")
         settingsButton.textSize = 20f
         settingsButton.setOnClickListener { showSettings() }
         header.addView(brandBlock, LinearLayout.LayoutParams(0, dp(54), 1f))
-        header.addView(storyButton, LinearLayout.LayoutParams(dp(76), dp(44)))
         header.addView(settingsButton, LinearLayout.LayoutParams(dp(46), dp(46)))
 
         // Futuristic AI hero card
@@ -184,10 +179,23 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(20, 47, 83), Color.rgb(12, 24, 43))
+                intArrayOf(Color.rgb(8, 48, 34), Color.rgb(12, 27, 23))
             ).apply { cornerRadius = dp(22).toFloat() }
         }
-        avatarView = AnimatedAvatarView(this)
+        val orb = TextView(this).apply {
+            text = "✦"
+            textSize = 48f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(0, 255, 150), Color.rgb(0, 105, 72), Color.rgb(4, 30, 24))
+            ).apply {
+                shape = GradientDrawable.OVAL
+                setStroke(dp(2), Color.rgb(70, 255, 175))
+            }
+            elevation = dp(8).toFloat()
+        }
         val heroTitle = TextView(this).apply {
             text = "আমি আপনার কথা শুনতে প্রস্তুত"
             textSize = 15f
@@ -207,7 +215,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         powerButton.background = rounded(green, 22)
         powerButton.setOnClickListener { toggleVoice() }
 
-        hero.addView(avatarView, LinearLayout.LayoutParams(dp(150), dp(150)))
+        hero.addView(orb, LinearLayout.LayoutParams(dp(88), dp(88)))
         hero.addView(heroTitle)
         hero.addView(statusText)
         val powerParams = LinearLayout.LayoutParams(
@@ -623,22 +631,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
             tts?.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {
-                        handler.post {
-                            if (::avatarView.isInitialized) avatarView.setSpeaking(true)
-                            // Keep speech recognition active during playback so a user's
-                            // voice can interrupt the assistant.
-                            if (voiceEnabled && !busy) {
-                                handler.postDelayed({ startListening() }, 250)
-                            }
-                        }
-                    }
+                    override fun onStart(utteranceId: String?) {}
 
                     override fun onDone(utteranceId: String?) {
                         handler.post {
-                            if (::avatarView.isInitialized) avatarView.setSpeaking(false)
-                            if (voiceEnabled && !busy && !listening) {
-                                handler.postDelayed({ startListening() }, 350)
+                            if (voiceEnabled && !busy) {
+                                handler.postDelayed({
+                                    startListening()
+                                }, 600)
                             }
                         }
                     }
@@ -652,7 +652,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun speak(message: String) {
         if (ttsReady) {
-            if (::avatarView.isInitialized) avatarView.setSpeaking(true)
             tts?.speak(
                 message,
                 TextToSpeech.QUEUE_FLUSH,
@@ -717,15 +716,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                             statusText.setTextColor(Color.rgb(255, 190, 90))
                         }
 
-                        override fun onBeginningOfSpeech() {
-                            // Barge-in: stop playback as soon as the microphone detects
-                            // the user's speech, then continue collecting their words.
-                            tts?.stop()
-                            if (::avatarView.isInitialized) avatarView.setSpeaking(false)
-                            listening = true
-                            statusText.text = "● আপনার কথা শুনছি..."
-                            statusText.setTextColor(Color.rgb(255, 190, 90))
-                        }
+                        override fun onBeginningOfSpeech() {}
                         override fun onRmsChanged(rmsdB: Float) {}
                         override fun onBufferReceived(buffer: ByteArray?) {}
 
@@ -882,115 +873,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 Toast.LENGTH_SHORT
             ).show()
         }
-    }
-
-    // STORY SCREEN — saved locally on this device
-    private fun showStoryScreen() {
-        val page = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(16), dp(18), dp(16))
-            setBackgroundColor(dark)
-        }
-        val top = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val back = makeButton("← ফিরে যান")
-        back.setOnClickListener { setContentView(root) }
-        val heading = TextView(this).apply {
-            text = "আমার গল্প"
-            textSize = 22f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(green)
-            gravity = Gravity.CENTER
-        }
-        top.addView(back, LinearLayout.LayoutParams(dp(104), dp(44)))
-        top.addView(heading, LinearLayout.LayoutParams(0, dp(48), 1f))
-        page.addView(top)
-
-        val titleField = EditText(this).apply {
-            hint = "গল্পের নাম লিখুন"
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.GRAY)
-            textSize = 16f
-            setPadding(dp(14), dp(8), dp(14), dp(8))
-            background = rounded(cardColor, 12)
-        }
-        val storyField = EditText(this).apply {
-            hint = "এখানে আপনার গল্প লিখুন..."
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.GRAY)
-            textSize = 15f
-            minLines = 7
-            gravity = Gravity.TOP
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = rounded(cardColor, 12)
-        }
-        val save = makeButton("গল্প সংরক্ষণ করুন")
-        save.background = rounded(green, 18)
-        save.setTextColor(dark)
-        val listHeading = sectionTitle("সংরক্ষিত গল্প")
-        val savedList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val listScroll = ScrollView(this).apply { addView(savedList) }
-
-        fun refreshStories() {
-            savedList.removeAllViews()
-            val raw = getSharedPreferences("banglar_ai", MODE_PRIVATE)
-                .getString("stories", "[]") ?: "[]"
-            try {
-                val stories = JSONArray(raw)
-                for (i in 0 until stories.length()) {
-                    val item = stories.getJSONObject(i)
-                    val storyTitle = item.optString("title", "নামহীন গল্প")
-                    val card = makeButton("📖  $storyTitle")
-                    card.gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                    card.setOnClickListener {
-                        titleField.setText(storyTitle)
-                        storyField.setText(item.optString("body", ""))
-                    }
-                    savedList.addView(card, LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, dp(48)
-                    ).apply { setMargins(0, dp(3), 0, dp(3)) })
-                }
-            } catch (_: Exception) {
-                getSharedPreferences("banglar_ai", MODE_PRIVATE).edit()
-                    .putString("stories", "[]").apply()
-            }
-        }
-
-        save.setOnClickListener {
-            val storyTitle = titleField.text.toString().trim()
-            val storyBody = storyField.text.toString().trim()
-            if (storyTitle.isEmpty() || storyBody.isEmpty()) {
-                Toast.makeText(this, "গল্পের নাম ও লেখা দুটোই দিন", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val prefs = getSharedPreferences("banglar_ai", MODE_PRIVATE)
-            val stories = try { JSONArray(prefs.getString("stories", "[]")) }
-                catch (_: Exception) { JSONArray() }
-            stories.put(JSONObject().put("title", storyTitle).put("body", storyBody))
-            prefs.edit().putString("stories", stories.toString()).apply()
-            titleField.setText("")
-            storyField.setText("")
-            refreshStories()
-            Toast.makeText(this, "গল্প এই ফোনে সংরক্ষণ হয়েছে", Toast.LENGTH_SHORT).show()
-        }
-
-        page.addView(titleField, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(52)
-        ).apply { setMargins(0, dp(14), 0, dp(8)) })
-        page.addView(storyField, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-        page.addView(save, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(48)
-        ).apply { setMargins(0, dp(10), 0, dp(8)) })
-        page.addView(listHeading)
-        page.addView(listScroll, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(140)
-        ))
-        setContentView(page)
-        refreshStories()
     }
 
     // SETTINGS AND CLEAR CHAT

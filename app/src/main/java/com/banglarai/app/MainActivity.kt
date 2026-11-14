@@ -22,6 +22,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -52,6 +53,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var root: LinearLayout
+    private lateinit var contentHost: FrameLayout
+    private lateinit var homeBody: LinearLayout
+    private lateinit var chatHeading: LinearLayout
+    private lateinit var inputRow: LinearLayout
+    private var selectedTab = 0
     private lateinit var chatLayout: LinearLayout
     private lateinit var chatScroll: ScrollView
     private lateinit var inputBox: EditText
@@ -137,6 +143,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun showHome() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setBackgroundColor(dark)
+        }
+        contentHost = FrameLayout(this)
+        homeBody = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(12), dp(16), dp(10))
             setBackgroundColor(dark)
         }
@@ -164,7 +175,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         brandBlock.addView(tagline)
         val settingsButton = makeButton("⚙")
         settingsButton.textSize = 20f
-        settingsButton.setOnClickListener { showSettings() }
+        settingsButton.setOnClickListener { renderTab(4) }
         header.addView(brandBlock, LinearLayout.LayoutParams(0, dp(54), 1f))
         header.addView(settingsButton, LinearLayout.LayoutParams(dp(48), dp(46)))
 
@@ -221,7 +232,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         hero.addView(powerButton, powerParams)
 
         // Chat panel
-        val chatHeading = LinearLayout(this).apply {
+        chatHeading = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
@@ -246,7 +257,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         chatScroll.addView(chatLayout)
 
         // Message composer
-        val inputRow = LinearLayout(this).apply {
+        inputRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(8), 0, dp(4))
@@ -302,27 +313,202 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         addControl(controls3, "Gallery") { openGallery() }
         addControl(controls3, "Brightness") { openSettings(Settings.ACTION_DISPLAY_SETTINGS) }
 
-        root.addView(header)
+        homeBody.addView(header)
         val heroParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
         )
         heroParams.setMargins(0, dp(8), 0, dp(8))
-        root.addView(hero, heroParams)
-        root.addView(chatHeading)
-        root.addView(chatScroll, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-        root.addView(inputRow)
-        root.addView(controlHeading)
-        root.addView(controls1)
-        root.addView(controls2)
-        root.addView(controls3)
+        homeBody.addView(hero, heroParams)
+        homeBody.addView(controlHeading)
+        homeBody.addView(controls1)
+        homeBody.addView(controls2)
+        homeBody.addView(controls3)
 
+        contentHost.addView(homeBody, FrameLayout.LayoutParams(-1, -1))
+        root.addView(contentHost, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(createBottomNavigation())
         setContentView(root)
         restoreConversation()
         if (conversation.isEmpty()) {
             addMessage(false, "আসসালামু আলাইকুম! আমি বাংলার AI। আমাকে যেকোনো প্রশ্ন করতে পারেন।")
         }
+    }
+
+    // BOTTOM NAVIGATION AND FULL-PAGE SCREENS
+
+    private fun createBottomNavigation(): LinearLayout {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(5), dp(7), dp(5), dp(7))
+            setBackgroundColor(Color.rgb(9, 23, 19))
+        }
+        val items = listOf("⌂\nহোম", "✉\nচ্যাট", "▦\nটুলস", "◷\nইতিহাস", "⚙\nসেটিংস")
+        items.forEachIndexed { index, label ->
+            val button = TextView(this).apply {
+                text = label
+                gravity = Gravity.CENTER
+                textSize = 11f
+                typeface = if (selectedTab == index) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                setTextColor(if (selectedTab == index) green else Color.LTGRAY)
+                setPadding(dp(2), dp(3), dp(2), dp(3))
+                setOnClickListener { renderTab(index) }
+            }
+            bar.addView(button, LinearLayout.LayoutParams(0, dp(52), 1f))
+        }
+        return bar
+    }
+
+    private fun renderTab(index: Int) {
+        selectedTab = index
+        contentHost.removeAllViews()
+        when (index) {
+            0 -> contentHost.addView(homeBody, FrameLayout.LayoutParams(-1, -1))
+            1 -> {
+                val page = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(14), dp(12), dp(14), dp(8))
+                    setBackgroundColor(dark)
+                }
+                page.addView(chatHeading)
+                page.addView(chatScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+                page.addView(inputRow)
+                contentHost.addView(page, FrameLayout.LayoutParams(-1, -1))
+            }
+            2 -> contentHost.addView(buildToolsPage(), FrameLayout.LayoutParams(-1, -1))
+            3 -> contentHost.addView(buildHistoryPage(), FrameLayout.LayoutParams(-1, -1))
+            4 -> contentHost.addView(buildSettingsPage(), FrameLayout.LayoutParams(-1, -1))
+        }
+        if (root.childCount > 1) root.removeViewAt(root.childCount - 1)
+        root.addView(createBottomNavigation())
+    }
+
+    private fun pageShell(title: String, subtitle: String): LinearLayout {
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            setBackgroundColor(dark)
+        }
+        page.addView(TextView(this).apply {
+            text = title
+            textSize = 25f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(green)
+        })
+        page.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 13f
+            setTextColor(Color.LTGRAY)
+            setPadding(0, dp(5), 0, dp(16))
+        })
+        return page
+    }
+
+    private fun pageAction(parent: LinearLayout, title: String, detail: String, action: () -> Unit) {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), dp(13), dp(15), dp(13))
+            background = rounded(cardColor, 16)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
+        }
+        card.addView(TextView(this).apply {
+            text = title
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+        })
+        card.addView(TextView(this).apply {
+            text = detail
+            textSize = 12f
+            setTextColor(Color.LTGRAY)
+            setPadding(0, dp(4), 0, 0)
+        })
+        val params = LinearLayout.LayoutParams(-1, -2)
+        params.setMargins(0, 0, 0, dp(10))
+        parent.addView(card, params)
+    }
+
+    private fun buildToolsPage(): View {
+        val page = pageShell("স্মার্ট টুলস", "ফোনের কাজগুলো প্রয়োজন অনুযায়ী খুলুন।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pageAction(list, "🔦 ফ্ল্যাশলাইট", "ফোনের ফ্ল্যাশ চালু বা বন্ধ করুন।") { toggleFlashlight() }
+        pageAction(list, "📷 ক্যামেরা", "ক্যামেরা খুলুন।") { openCamera() }
+        pageAction(list, "🖼 গ্যালারি ও ফাইল", "ছবি বা ডকুমেন্ট নির্বাচন করুন।") { openGallery() }
+        pageAction(list, "📶 Wi-Fi সেটিংস", "ফোনের Wi-Fi পেজ খুলুন।") { openSettings(Settings.ACTION_WIFI_SETTINGS) }
+        pageAction(list, "Bluetooth সেটিংস", "Bluetooth সংযোগের পেজ খুলুন।") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
+        pageAction(list, "▶ YouTube", "YouTube খুলুন।") { openUrl("https://www.youtube.com") }
+        pageAction(list, "Facebook", "Facebook খুলুন।") { openUrl("https://www.facebook.com") }
+        pageAction(list, "☀ ডিসপ্লে", "Brightness ও display সেটিংস খুলুন।") { openSettings(Settings.ACTION_DISPLAY_SETTINGS) }
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
+    }
+
+    private fun buildHistoryPage(): View {
+        val page = pageShell("চ্যাটের ইতিহাস", "এই ডিভাইসে সংরক্ষিত সাম্প্রতিক কথোপকথন।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        if (conversation.isEmpty()) {
+            pageAction(list, "এখনো কোনো ইতিহাস নেই", "AI-এর সঙ্গে কথা বললে এখানে দেখা যাবে।") { renderTab(1) }
+        } else {
+            conversation.takeLast(80).forEach { item ->
+                pageAction(list, if (item.first == "user") "আপনি" else "বাংলার AI", item.second) { renderTab(1) }
+            }
+            pageAction(list, "ইতিহাস মুছুন", "এই ডিভাইসে সংরক্ষিত কথোপকথন মুছে যাবে।") {
+                clearChat()
+                renderTab(3)
+            }
+        }
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
+    }
+
+    private fun buildSettingsPage(): View {
+        val page = pageShell("সেটিংস", "প্রতিটি অনুমতির কাজ বুঝে তারপর চালু করুন। API Key এখানে লাগবে না।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pageAction(list, "🎙 মাইক্রোফোন অনুমতি", "ভয়েসে কথা বলা ও Speech Recognition-এর জন্য।") {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_PERMISSION)
+            } else Toast.makeText(this, "মাইক্রোফোন অনুমতি চালু আছে", Toast.LENGTH_SHORT).show()
+        }
+        pageAction(list, "📷 ক্যামেরা অনুমতি", "ক্যামেরা-সম্পর্কিত ফিচারের জন্য।") {
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION)
+            } else openCamera()
+        }
+        pageAction(list, "🪟 Floating AI অনুমতি", "অন্য অ্যাপের ওপর ছোট AI বাটন দেখানোর জন্য।") {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            } else toggleFloatingAssistant()
+        }
+        pageAction(list, "♿ Accessibility", "স্ক্রিনের দৃশ্যমান লেখা পড়া বা সহায়ক কাজের জন্য। প্রয়োজন না হলে চালু করবেন না।") {
+            openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        }
+        pageAction(list, "🔔 নোটিফিকেশন অনুমতি", "বাংলার AI-এর নিজের নোটিফিকেশনের জন্য; অন্য অ্যাপের নোটিফিকেশন পড়ার অনুমতি নয়।") {
+            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 203)
+            } else Toast.makeText(this, "নোটিফিকেশন অনুমতি চালু আছে অথবা আলাদা অনুমতি প্রয়োজন নেই", Toast.LENGTH_LONG).show()
+        }
+        pageAction(list, "📁 ফাইল ও ছবি নির্বাচন", "Android-এর নিরাপদ File Picker খুলবে; প্রয়োজনের ফাইল নিজে নির্বাচন করুন।") { openGallery() }
+        pageAction(list, "🛡 গোপনীয়তা", "চ্যাটের ইতিহাস এই ডিভাইসে থাকে; AI উত্তর পেতে প্রশ্ন Backend-এ পাঠানো হয়।") {
+            AlertDialog.Builder(this).setTitle("গোপনীয়তা")
+                .setMessage("আপনার লেখা প্রশ্ন AI উত্তর তৈরির জন্য বাংলার AI Backend-এ পাঠানো হয়। API Key অ্যাপের মধ্যে রাখা হয় না। চ্যাটের ইতিহাস এই ডিভাইসের অ্যাপ ডেটায় থাকে।")
+                .setPositiveButton("ঠিক আছে", null).show()
+        }
+        pageAction(list, "ℹ অ্যাপ সম্পর্কে", "বাংলার AI • বাংলা ভাষার ব্যক্তিগত সহকারী") {
+            AlertDialog.Builder(this).setTitle("বাংলার AI")
+                .setMessage("বাংলার AI একটি বাংলা ভয়েস ও চ্যাট সহকারী। কিছু ফিচার চালাতে ইন্টারনেট ও Android অনুমতি প্রয়োজন।")
+                .setPositiveButton("বন্ধ", null).show()
+        }
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
     }
 
     // DESIGN HELPERS
@@ -821,29 +1007,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     // SETTINGS AND CLEAR CHAT
 
-    private fun showSettings() {
-        val options = arrayOf(
-            "চ্যাট মুছে ফেলুন",
-            "ভয়েস চালু / বন্ধ",
-            "ফ্লোটিং AI চালু / বন্ধ",
-            "Accessibility অনুমতি",
-            "ফোনের Settings"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("বাংলার AI সেটিংস")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> clearChat()
-                    1 -> toggleVoice()
-                    2 -> toggleFloatingAssistant()
-                    3 -> openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    4 -> openSettings(Settings.ACTION_SETTINGS)
-                }
-            }
-            .setNegativeButton("বন্ধ", null)
-            .show()
-    }
+    private fun showSettings() { renderTab(4) }
 
     private fun clearChat() {
         chatLayout.removeAllViews()

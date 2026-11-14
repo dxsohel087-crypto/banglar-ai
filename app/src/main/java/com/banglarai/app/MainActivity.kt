@@ -227,7 +227,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         val chatTitle = sectionTitle("AI CHAT")
         val online = TextView(this).apply {
-            text = "● LIVE"
+            text = "● READY"
             textSize = 10f
             setTextColor(green)
             gravity = Gravity.CENTER_VERTICAL
@@ -879,7 +879,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             "ভয়েস চালু / বন্ধ",
             "API Key সেট করুন",
             "ফ্লোটিং AI চালু / বন্ধ",
-            "ফোনের Settings"
+            "ফোনের Settings",
+            "গোপনীয়তা ও অনুমতি"
         )
 
         AlertDialog.Builder(this)
@@ -891,7 +892,30 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     2 -> showApiKeyDialog()
                     3 -> toggleFloatingAssistant()
                     4 -> openSettings(Settings.ACTION_SETTINGS)
+                    5 -> showPrivacyInfo()
                 }
+            }
+            .setNegativeButton("বন্ধ", null)
+            .show()
+    }
+
+    private fun showPrivacyInfo() {
+        AlertDialog.Builder(this)
+            .setTitle("গোপনীয়তা ও অনুমতি")
+            .setMessage(
+                "আপনার চ্যাটের ইতিহাস এই ডিভাইসের অ্যাপ-প্রাইভেট স্টোরেজে রাখা হয়। " +
+                    "আপনার দেওয়া AI API Key Android Keystore ব্যবহার করে এনক্রিপ্ট করে সংরক্ষণ করা হয়। " +
+                    "AI উত্তর পেতে পাঠানো বার্তা কনফিগার করা AI প্রদানকারীর সার্ভারে যায়।\\n\\n" +
+                    "মাইক্রোফোন, ক্যামেরা/ফ্ল্যাশলাইট, Floating Assistant এবং Accessibility সুবিধা " +
+                    "ঐচ্ছিক। প্রয়োজন অনুযায়ী Android Settings থেকে অনুমতি বন্ধ করতে পারবেন। " +
+                    "Accessibility ব্যবহারকারীর নির্দেশে দৃশ্যমান লেখা পড়া বা নির্দিষ্ট আইটেমে " +
+                    "ক্লিক করার জন্য; গোপনে স্ক্রিন পর্যবেক্ষণের জন্য নয়।\\n\\n" +
+                    "এটি উন্নয়নাধীন সংস্করণ। Public release-এর আগে পূর্ণ Privacy Policy প্রকাশ করা হবে।"
+            )
+            .setPositiveButton("অ্যাপের অনুমতি") { _, _ ->
+                openSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS.let {
+                    "$it"
+                }.also { })
             }
             .setNegativeButton("বন্ধ", null)
             .show()

@@ -24,6 +24,8 @@
     <application
         android:allowBackup="true"
         android:label="বাংলার AI"
+        android:icon="@drawable/ic_banglar_ai_logo"
+        android:roundIcon="@drawable/ic_banglar_ai_logo"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 

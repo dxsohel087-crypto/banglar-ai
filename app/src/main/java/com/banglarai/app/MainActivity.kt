@@ -32,10 +32,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import org.json.JSONArray
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
@@ -79,6 +75,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var listening = false
     private var busy = false
     private var torchOn = false
+    private var pendingTorchState: Boolean? = null
 
     private val conversation = mutableListOf<Pair<String, String>>()
 
@@ -113,7 +110,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
 
         val title = TextView(this).apply {
-            text = "বাংলার AI"
+            text = "NEXVIO"
             textSize = 34f
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
@@ -121,14 +118,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
 
         val subtitle = TextView(this).apply {
-            text = "FUTURISTIC PERSONAL ASSISTANT"
+            text = "OFFLINE VOICE PHONE CONTROL"
             textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(green)
         }
 
         val version = TextView(this).apply {
-            text = "GROQ AI  •  বাংলা ভয়েস অ্যাসিস্ট্যান্ট"
+            text = "YOUR VOICE • YOUR CONTROL"
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(Color.LTGRAY)
@@ -169,13 +166,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.VERTICAL
         }
         val heading = TextView(this).apply {
-            text = "✦ বাংলার AI"
+            text = "✦ NEXVIO"
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(green)
         }
         val tagline = TextView(this).apply {
-            text = "আপনার ব্যক্তিগত AI সহকারী"
+            text = "আপনার কণ্ঠে ফোন নিয়ন্ত্রণ"
             textSize = 11f
             setTextColor(Color.LTGRAY)
         }
@@ -341,7 +338,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         setContentView(root)
         restoreConversation()
         if (conversation.isEmpty()) {
-            addMessage(false, "আসসালামু আলাইকুম! আমি বাংলার AI। আমাকে যেকোনো প্রশ্ন করতে পারেন।")
+            addMessage(false, "আমি NEXVIO। আপনার ফোনে যে কাজগুলো অনুমোদিত, সেগুলো মুখে বলুন বা নিচের কমান্ড থেকে বেছে নিন।")
         }
     }
 
@@ -354,7 +351,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(dp(5), dp(7), dp(5), dp(7))
             setBackgroundColor(Color.rgb(9, 23, 19))
         }
-        val items = listOf("⌂\nহোম", "✉\nচ্যাট", "✧\nস্টোরি", "◷\nইতিহাস", "⚙\nসেটিংস")
+        val items = listOf("⌂\nহোম", "✉\nকমান্ড", "✧\nসিস্টেম", "◷\nইতিহাস", "⚙\nসেটিংস")
         items.forEachIndexed { index, label ->
             val button = TextView(this).apply {
                 text = label
@@ -389,7 +386,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 page.addView(inputRow)
                 contentHost.addView(page, FrameLayout.LayoutParams(-1, -1))
             }
-            2 -> contentHost.addView(buildStoryPage(), FrameLayout.LayoutParams(-1, -1))
+            2 -> contentHost.addView(buildToolsPage(), FrameLayout.LayoutParams(-1, -1))
             3 -> contentHost.addView(buildHistoryPage(), FrameLayout.LayoutParams(-1, -1))
             4 -> contentHost.addView(buildSettingsPage(), FrameLayout.LayoutParams(-1, -1))
         }
@@ -445,7 +442,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun buildStoryPage(): View {
-        val page = pageShell("স্টোরি", "বাংলার AI-এর সঙ্গে তৈরি করা গল্প ও লেখার জায়গা।")
+        val page = pageShell("স্টোরি", "NEXVIO-এর সঙ্গে তৈরি করা গল্প ও লেখার জায়গা।")
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         pageAction(list, "✍ নতুন গল্প লিখুন", "চ্যাটে গিয়ে গল্পের বিষয় বলুন; AI গল্প তৈরি করবে।") { renderTab(1) }
         pageAction(list, "💬 AI চ্যাট খুলুন", "আপনার গল্পের ধারণা বা চরিত্র নিয়ে কথা বলুন।") { renderTab(1) }
@@ -454,87 +451,72 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun buildToolsPage(): View {
-        val page = pageShell("স্মার্ট টুলস", "ফোনের কাজগুলো প্রয়োজন অনুযায়ী খুলুন।")
+        val page = pageShell("কমান্ড লাইব্রেরি", "প্রতিটি বিভাগের প্রশ্ন দেখুন, নিচের কমান্ডে চাপ দিন অথবা নিজের ভাষায় বলুন।")
         val scroll = ScrollView(this)
-        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        pageAction(list, "🔦 ফ্ল্যাশলাইট", "ফোনের ফ্ল্যাশ চালু বা বন্ধ করুন।") { toggleFlashlight() }
-        pageAction(list, "📷 ক্যামেরা", "ক্যামেরা খুলুন।") { openCamera() }
-        pageAction(list, "🖼 গ্যালারি ও ফাইল", "ছবি বা ডকুমেন্ট নির্বাচন করুন।") { openGallery() }
-        pageAction(list, "📶 Wi-Fi সেটিংস", "ফোনের Wi-Fi পেজ খুলুন।") { openSettings(Settings.ACTION_WIFI_SETTINGS) }
-        pageAction(list, "Bluetooth সেটিংস", "Bluetooth সংযোগের পেজ খুলুন।") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
-        pageAction(list, "▶ YouTube", "YouTube খুলুন।") { openUrl("https://www.youtube.com") }
-        pageAction(list, "Facebook", "Facebook খুলুন।") { openUrl("https://www.facebook.com") }
-        pageAction(list, "☀ ডিসপ্লে", "Brightness ও display সেটিংস খুলুন।") { openSettings(Settings.ACTION_DISPLAY_SETTINGS) }
+        val list = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(18))
+        }
+        commandSection(list, "📱 অ্যাপ ও ফোন", "কোন অ্যাপ বা ফোনের অংশ খুলতে চান?", listOf(
+            "YouTube খোলো", "Facebook খোলো", "Chrome খোলো", "ক্যালকুলেটর খোলো",
+            "ক্যামেরা খোলো", "সেটিংস খোলো", "সব অ্যাপের তালিকা দেখাও", "হোম স্ক্রিনে যাও"
+        ))
+        commandSection(list, "🔦 আলো ও ডিসপ্লে", "ফোনের আলো বা স্ক্রিনে কী করতে চান?", listOf(
+            "টর্চ জ্বালাও", "টর্চ বন্ধ করো", "ব্রাইটনেস সেটিংস খোলো"
+        ))
+        commandSection(list, "🔊 শব্দ নিয়ন্ত্রণ", "শব্দের মাত্রা কীভাবে বদলাবেন?", listOf(
+            "ভলিউম বাড়াও", "ভলিউম কমাও", "সাউন্ড মিউট করো", "সাউন্ড চালু করো"
+        ))
+        commandSection(list, "📶 সংযোগ ও নেটওয়ার্ক", "কোন সংযোগের সেটিংস খুলতে চান?", listOf(
+            "Wi-Fi সেটিংস খোলো", "Bluetooth সেটিংস খোলো", "Airplane mode সেটিংস খোলো"
+        ))
+        commandSection(list, "📂 ফাইল ও স্ক্রিন", "কোন ফাইল দেখতে বা স্ক্রিনে কী আছে জানতে চান?", listOf(
+            "গ্যালারি খোলো", "ফাইল বাছাই করো", "স্ক্রিনে কী আছে পড়ে বলো",
+            "স্ক্রিনে Shorts লেখা খুঁজে ক্লিক করো"
+        ))
+        commandSection(list, "☎️ ফোনের কাজ", "ফোনের কোন কাজে যেতে চান?", listOf(
+            "ডায়ালার খোলো", "এখন সময় কত", "কমান্ড দেখাও"
+        ))
         scroll.addView(list)
         page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         return page
     }
 
-    private fun buildHistoryPage(): View {
-        val page = pageShell("চ্যাটের ইতিহাস", "এই ডিভাইসে সংরক্ষিত সাম্প্রতিক কথোপকথন।")
-        val scroll = ScrollView(this)
-        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        if (conversation.isEmpty()) {
-            pageAction(list, "এখনো কোনো ইতিহাস নেই", "AI-এর সঙ্গে কথা বললে এখানে দেখা যাবে।") { renderTab(1) }
-        } else {
-            conversation.takeLast(80).forEach { item ->
-                pageAction(list, if (item.first == "user") "আপনি" else "বাংলার AI", item.second) { renderTab(1) }
-            }
-            pageAction(list, "ইতিহাস মুছুন", "এই ডিভাইসে সংরক্ষিত কথোপকথন মুছে যাবে।") {
-                clearChat()
-                renderTab(3)
-            }
+    private fun commandSection(parent: LinearLayout, title: String, question: String, commands: List<String>) {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+            background = rounded(cardColor, 17)
         }
-        scroll.addView(list)
-        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        return page
+        card.addView(TextView(this).apply {
+            text = title
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(green)
+        })
+        card.addView(TextView(this).apply {
+            text = question
+            textSize = 12f
+            setTextColor(Color.LTGRAY)
+            setPadding(0, dp(5), 0, dp(9))
+        })
+        commands.forEach { command ->
+            val button = makeButton("›  " + command)
+            button.gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            button.textSize = 13f
+            button.setTextColor(Color.WHITE)
+            button.background = rounded(Color.rgb(24, 47, 39), 12)
+            val params = LinearLayout.LayoutParams(-1, dp(42))
+            params.setMargins(0, 0, 0, dp(6))
+            card.addView(button, params)
+            button.setOnClickListener { runSuggestedCommand(command) }
+        }
+        val params = LinearLayout.LayoutParams(-1, -2)
+        params.setMargins(0, 0, 0, dp(11))
+        parent.addView(card, params)
     }
 
-    private fun buildSettingsPage(): View {
-        val page = pageShell("সেটিংস", "প্রতিটি অনুমতির কাজ বুঝে তারপর চালু করুন। API Key এখানে লাগবে না।")
-        val scroll = ScrollView(this)
-        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        pageAction(list, "🎙 মাইক্রোফোন অনুমতি", "ভয়েসে কথা বলা ও Speech Recognition-এর জন্য।") {
-            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_PERMISSION)
-            } else Toast.makeText(this, "মাইক্রোফোন অনুমতি চালু আছে", Toast.LENGTH_SHORT).show()
-        }
-        pageAction(list, "📷 ক্যামেরা অনুমতি", "ক্যামেরা-সম্পর্কিত ফিচারের জন্য।") {
-            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION)
-            } else openCamera()
-        }
-        pageAction(list, "🪟 Floating AI অনুমতি", "অন্য অ্যাপের ওপর ছোট AI বাটন দেখানোর জন্য।") {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            } else toggleFloatingAssistant()
-        }
-        pageAction(list, "♿ Accessibility", "স্ক্রিনের দৃশ্যমান লেখা পড়া বা সহায়ক কাজের জন্য। প্রয়োজন না হলে চালু করবেন না।") {
-            openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-        }
-        pageAction(list, "🔔 নোটিফিকেশন অনুমতি", "বাংলার AI-এর নিজের নোটিফিকেশনের জন্য; অন্য অ্যাপের নোটিফিকেশন পড়ার অনুমতি নয়।") {
-            if (android.os.Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 203)
-            } else Toast.makeText(this, "নোটিফিকেশন অনুমতি চালু আছে অথবা আলাদা অনুমতি প্রয়োজন নেই", Toast.LENGTH_LONG).show()
-        }
-        pageAction(list, "📁 ফাইল ও ছবি নির্বাচন", "Android-এর নিরাপদ File Picker খুলবে; প্রয়োজনের ফাইল নিজে নির্বাচন করুন।") { openGallery() }
-        pageAction(list, "🛡 গোপনীয়তা", "চ্যাটের ইতিহাস এই ডিভাইসে থাকে; AI উত্তর পেতে প্রশ্ন Backend-এ পাঠানো হয়।") {
-            AlertDialog.Builder(this).setTitle("গোপনীয়তা")
-                .setMessage("আপনার লেখা প্রশ্ন AI উত্তর তৈরির জন্য বাংলার AI Backend-এ পাঠানো হয়। API Key অ্যাপের মধ্যে রাখা হয় না। চ্যাটের ইতিহাস এই ডিভাইসের অ্যাপ ডেটায় থাকে।")
-                .setPositiveButton("ঠিক আছে", null).show()
-        }
-        pageAction(list, "ℹ অ্যাপ সম্পর্কে", "বাংলার AI • বাংলা ভাষার ব্যক্তিগত সহকারী") {
-            AlertDialog.Builder(this).setTitle("বাংলার AI")
-                .setMessage("বাংলার AI একটি বাংলা ভয়েস ও চ্যাট সহকারী। কিছু ফিচার চালাতে ইন্টারনেট ও Android অনুমতি প্রয়োজন।")
-                .setPositiveButton("বন্ধ", null).show()
-        }
-        scroll.addView(list)
-        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        return page
-    }
-
-    // DESIGN HELPERS
+// DESIGN HELPERS
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
@@ -594,7 +576,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun addMessage(isUser: Boolean, message: String) {
         val bubble = TextView(this).apply {
-            text = (if (isUser) "আপনি: " else "বাংলার AI: ") + message
+            text = (if (isUser) "আপনি: " else "NEXVIO: ") + message
             textSize = 14f
             gravity = if (isUser) Gravity.END else Gravity.START
             setTextColor(
@@ -624,80 +606,246 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun sendMessage() {
         val message = inputBox.text.toString().trim()
         if (message.isEmpty()) return
-
         if (busy) {
             Toast.makeText(this, "একটু অপেক্ষা করুন", Toast.LENGTH_SHORT).show()
             return
         }
-
         inputBox.setText("")
         addMessage(true, message)
         conversation.add(Pair("user", message))
         saveConversation()
-        if (handleLocalCommand(message)) return
-        askGroq()
+        if (!handleLocalCommand(message)) {
+            completeLocalAction(
+                "এই কমান্ডটি এখনো শেখানো হয়নি। ‘কমান্ড’ পেজে প্রস্তুত নির্দেশগুলো দেখুন। " +
+                    "NEXVIO অফলাইনে কাজ করে; অনলাইন AI চ্যাট ব্যবহার করে না।"
+            )
+        }
     }
 
-    /**
-     * Small, explicit on-device actions. AI chat remains the fallback.
-     * Accessibility actions work only after the user enables the service in Android Settings.
-     */
     private fun handleLocalCommand(message: String): Boolean {
         val text = message.trim()
         val lower = text.lowercase(Locale.ROOT)
+        fun has(vararg words: String): Boolean = words.any { lower.contains(it) }
 
-        if (lower.contains("youtube") && (lower.contains("সার্চ") || lower.contains("খুঁজে") || lower.contains("search"))) {
-            val query = text.substringAfter("youtube", "")
-                .replace(Regex("(?i)^(এ|তে|\u0020)*"), "")
-                .replace(Regex("(সার্চ করো|সার্চ দাও|খুঁজে দাও|search করে দাও|search)$", RegexOption.IGNORE_CASE), "")
-                .trim()
-            if (query.isNotBlank()) {
-                openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(query))
-                completeLocalAction("YouTube-এ “$query” সার্চ খুলে দিয়েছি।")
-            } else {
-                openUrl("https://www.youtube.com")
-                completeLocalAction("YouTube খুলে দিয়েছি। কী সার্চ করতে চান বলুন।")
-            }
-            return true
-        }
-
-        if (lower.contains("youtube") && (lower.contains("খুলে") || lower.contains("চালু"))) {
-            openUrl("https://www.youtube.com")
-            completeLocalAction("YouTube খুলে দিয়েছি।")
-            return true
-        }
-
-        if ((lower.contains("স্ক্রিনে কী আছে") || lower.contains("পেজে কী আছে") ||
-             lower.contains("পর্দায় কী আছে") || lower.contains("স্ক্রিন পড়ে") ||
-             lower.contains("স্ক্রিন পড়ে")) && lower.contains("বল")) {
+        if (has("স্ক্রিনে কী আছে", "পেজে কী আছে", "পর্দায় কী আছে", "পর্দায় কী আছে",
+                "স্ক্রিন পড়ে", "স্ক্রিন পড়ে", "লেখাগুলো পড়ে", "লেখাগুলো পড়ে")) {
             val visible = BanglarAccessibilityService.readVisibleText()
             val answer = if (visible.isNullOrBlank()) {
-                "অন্য অ্যাপের স্ক্রিন পড়তে Settings থেকে বাংলার AI Accessibility চালু করুন। তারপর আবার বলুন।"
+                "স্ক্রিন পড়তে Android Settings থেকে NEXVIO Accessibility চালু করুন। তারপর আবার বলুন।"
             } else {
-                "বর্তমান স্ক্রিনে যে লেখা পড়তে পারছি:\\n" + visible.take(2200)
+                "বর্তমান স্ক্রিনে দেখা যাচ্ছে:\n" + visible.take(2200)
             }
             completeLocalAction(answer)
             return true
         }
 
-        if (lower.contains("ক্লিক করো") || lower.contains("চাপ দাও")) {
+        if (has("ক্লিক করো", "চাপ দাও", "ট্যাপ করো", "চাপুন")) {
             val target = text.substringAfter("স্ক্রিনে", "")
                 .substringBefore("লেখা")
                 .substringBefore("ক্লিক করো")
                 .substringBefore("চাপ দাও")
+                .substringBefore("ট্যাপ করো")
                 .trim()
             if (target.isBlank()) {
-                completeLocalAction("কোন লেখাযুক্ত বোতাম বা আইটেমে ক্লিক করব তা বলুন। যেমন: “স্ক্রিনে Shorts লেখা খুঁজে ক্লিক করো।”")
+                completeLocalAction("কোন লেখা বা বোতামে চাপ দেব? যেমন: স্ক্রিনে Shorts লেখা খুঁজে ক্লিক করো।")
             } else {
                 val clicked = BanglarAccessibilityService.clickVisibleText(target)
                 completeLocalAction(
-                    if (clicked) "“$target” আইটেমে ক্লিক করেছি।"
-                    else "“$target” লেখা স্ক্রিনে পাওয়া যায়নি, অথবা সেটিতে ক্লিক করা সম্ভব হয়নি।"
+                    if (clicked) "“" + target + "” আইটেমে চাপ দিয়েছি।"
+                    else "“" + target + "” পাওয়া যায়নি। Accessibility চালু আছে কি না দেখুন।"
                 )
             }
             return true
         }
+
+        if (has("টর্চ", "ফ্ল্যাশলাইট", "ফ্ল্যাশ")) {
+            when {
+                has("নেভাও", "বন্ধ", "অফ", "off") -> {
+                    toggleFlashlight(false)
+                    completeLocalAction("টর্চ বন্ধ করার নির্দেশ দেওয়া হয়েছে।")
+                }
+                has("জ্বালাও", "চালু", "অন", "on") -> {
+                    toggleFlashlight(true)
+                    completeLocalAction("টর্চ চালু করার নির্দেশ দেওয়া হয়েছে।")
+                }
+                else -> {
+                    toggleFlashlight()
+                    completeLocalAction("টর্চের অবস্থা পরিবর্তন করেছি।")
+                }
+            }
+            return true
+        }
+
+        if (has("ভলিউম", "শব্দ", "সাউন্ড")) {
+            val audio = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+            when {
+                has("বাড়াও", "বাড়াও", "বেশি", "উচ্চ") -> {
+                    audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        android.media.AudioManager.ADJUST_RAISE, android.media.AudioManager.FLAG_SHOW_UI)
+                    completeLocalAction("মিডিয়া ভলিউম বাড়িয়েছি।")
+                }
+                has("কমাও", "কমান", "নিচু") -> {
+                    audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        android.media.AudioManager.ADJUST_LOWER, android.media.AudioManager.FLAG_SHOW_UI)
+                    completeLocalAction("মিডিয়া ভলিউম কমিয়েছি।")
+                }
+                has("মিউট", "নীরব", "mute", "বন্ধ") -> {
+                    audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        android.media.AudioManager.ADJUST_MUTE, android.media.AudioManager.FLAG_SHOW_UI)
+                    completeLocalAction("মিডিয়া সাউন্ড মিউট করেছি।")
+                }
+                has("আনমিউট", "শব্দ চালু", "সাউন্ড চালু", "unmute") -> {
+                    audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        android.media.AudioManager.ADJUST_UNMUTE, android.media.AudioManager.FLAG_SHOW_UI)
+                    completeLocalAction("মিডিয়া সাউন্ড চালু করেছি।")
+                }
+                else -> {
+                    openSettings(Settings.ACTION_SOUND_SETTINGS)
+                    completeLocalAction("সাউন্ড সেটিংস খুলে দিয়েছি।")
+                }
+            }
+            return true
+        }
+
+        if (has("ওয়াইফাই", "ওয়াইফাই", "wi-fi", "wifi")) {
+            openSettings(Settings.ACTION_WIFI_SETTINGS)
+            completeLocalAction("Wi-Fi সেটিংস খুলে দিয়েছি। Android-এর নিয়ম অনুযায়ী এখান থেকে সংযোগ বদলান।")
+            return true
+        }
+        if (has("ব্লুটুথ", "bluetooth")) {
+            openSettings(Settings.ACTION_BLUETOOTH_SETTINGS)
+            completeLocalAction("Bluetooth সেটিংস খুলে দিয়েছি।")
+            return true
+        }
+        if (has("এয়ারপ্লেন", "এয়ারপ্লেন", "ফ্লাইট মোড", "airplane")) {
+            openSettings(Settings.ACTION_AIRPLANE_MODE_SETTINGS)
+            completeLocalAction("Airplane mode সেটিংস খুলে দিয়েছি।")
+            return true
+        }
+        if (has("ব্রাইটনেস", "স্ক্রিনের আলো", "ডিসপ্লে", "উজ্জ্বলতা")) {
+            openSettings(Settings.ACTION_DISPLAY_SETTINGS)
+            completeLocalAction("Display ও brightness সেটিংস খুলে দিয়েছি।")
+            return true
+        }
+
+        if (has("ক্যামেরা", "camera") && has("খোলো", "খুলে", "চালু", "open")) {
+            openCamera()
+            completeLocalAction("ক্যামেরা খুলেছি।")
+            return true
+        }
+        if (has("গ্যালারি", "ছবি দেখাও", "ফটো", "gallery", "photos", "ফাইল বাছাই") &&
+            has("খোলো", "খুলে", "দেখাও", "বাছাই", "open", "করো")) {
+            openGallery()
+            completeLocalAction("ছবি ও ফাইল বাছাই করার স্ক্রিন খুলেছি।")
+            return true
+        }
+        if (has("ডায়ালার", "ডায়ালার", "ফোন অ্যাপ", "কল করার স্ক্রিন", "নাম্বার") &&
+            has("খোলো", "খুলে", "চালু", "open")) {
+            try {
+                startActivity(Intent(Intent.ACTION_DIAL))
+                completeLocalAction("ফোনের ডায়ালার খুলেছি।")
+            } catch (_: Exception) {
+                completeLocalAction("এই ফোনে ডায়ালার খোলা যায়নি।")
+            }
+            return true
+        }
+        if (has("সব অ্যাপ", "অ্যাপের তালিকা", "ইনস্টল করা অ্যাপ")) {
+            openSettings(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)
+            completeLocalAction("ইনস্টল করা অ্যাপের তালিকা দেখার সেটিংস খুলেছি।")
+            return true
+        }
+        if (has("হোম স্ক্রিন", "হোমে যাও", "home screen", "গো হোম")) {
+            try {
+                startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
+                completeLocalAction("হোম স্ক্রিনে যাওয়ার নির্দেশ দিয়েছি।")
+            } catch (_: Exception) {
+                completeLocalAction("হোম স্ক্রিন খোলা যায়নি।")
+            }
+            return true
+        }
+        if (has("সেটিংস", "settings") && has("খোলো", "খুলে", "চালু", "open")) {
+            openSettings(Settings.ACTION_SETTINGS)
+            completeLocalAction("ফোনের Settings খুলেছি।")
+            return true
+        }
+
+        if (has("খোলো", "খুলে দাও", "খুলুন", "চালু করো", "চালু করুন", "ওপেন", "open")) {
+            val appAlias = when {
+                has("youtube", "ইউটিউব") -> "youtube"
+                has("facebook", "ফেসবুক") -> "facebook"
+                has("chrome", "ক্রোম", "ব্রাউজার") -> "chrome"
+                has("ক্যালকুলেটর", "calculator", "হিসাব") -> "calculator"
+                has("ফাইল ম্যানেজার", "file manager", "files", "ফাইল") -> "files"
+                has("মিউজিক", "গান", "music", "মিউজিক প্লেয়ার") -> "music"
+                else -> null
+            }
+            if (appAlias != null) {
+                val opened = openInstalledApp(appAlias)
+                completeLocalAction(
+                    if (opened) appAlias + " অ্যাপ খুলেছি।"
+                    else appAlias + " অ্যাপটি এই ফোনে পাওয়া যায়নি।"
+                )
+                return true
+            }
+        }
+
+        if (has("সময় কত", "এখন কয়টা", "এখন কয়টা", "সময় বল", "সময় বল")) {
+            val time = java.text.SimpleDateFormat("hh:mm a", Locale.getDefault()).format(java.util.Date())
+            completeLocalAction("এখন সময় " + time + "।")
+            return true
+        }
+        if (has("কমান্ড দেখাও", "কী কী করতে পারো", "কি কি করতে পারো", "সাহায্য", "help")) {
+            completeLocalAction("আমি অফলাইনে টর্চ, ভলিউম, Wi-Fi/Bluetooth সেটিংস, ক্যামেরা, ফাইল পিকার, ডায়ালার, ইনস্টল করা কয়েকটি অ্যাপ খোলা এবং Accessibility দিয়ে স্ক্রিনের লেখা পড়া/নির্বাচিত লেখা চাপার কাজ করতে পারি। ‘কমান্ড’ পেজে উদাহরণ আছে।")
+            return true
+        }
         return false
+    }
+
+    private fun openInstalledApp(alias: String): Boolean {
+        val packageCandidates = when (alias) {
+            "youtube" -> listOf("com.google.android.youtube")
+            "facebook" -> listOf("com.facebook.katana")
+            "chrome" -> listOf("com.android.chrome")
+            "music" -> listOf("com.google.android.apps.youtube.music", "com.spotify.music")
+            else -> emptyList()
+        }
+        for (appPackage in packageCandidates) {
+            val launch = packageManager.getLaunchIntentForPackage(appPackage)
+            if (launch != null) {
+                try {
+                    startActivity(launch)
+                    return true
+                } catch (_: Exception) {}
+            }
+        }
+        val wanted = when (alias) {
+            "calculator" -> listOf("calculator", "ক্যালকুলেটর")
+            "files" -> listOf("files", "file manager", "ফাইল")
+            "music" -> listOf("music", "মিউজিক", "গান")
+            else -> listOf(alias)
+        }
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val candidates = packageManager.queryIntentActivities(launcher, 0)
+        val match = candidates.firstOrNull { info ->
+            val label = info.loadLabel(packageManager).toString().lowercase(Locale.ROOT)
+            wanted.any { label.contains(it) }
+        } ?: return false
+        val appIntent = packageManager.getLaunchIntentForPackage(match.activityInfo.packageName) ?: return false
+        return try {
+            startActivity(appIntent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun runSuggestedCommand(command: String) {
+        if (!::inputBox.isInitialized) return
+        renderTab(1)
+        handler.postDelayed({
+            inputBox.setText(command)
+            sendMessage()
+        }, 120)
     }
 
     private fun completeLocalAction(reply: String) {
@@ -707,63 +855,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (voiceEnabled && ttsReady) speak(reply)
     }
 
-    // GROQ AI
-
-    private fun askGroq() {
-        busy = true
-        statusText.text = "● AI চিন্তা করছে..."
-        statusText.setTextColor(Color.YELLOW)
-        Thread {
-            var answer: String
-            var connection: HttpURLConnection? = null
-            try {
-                connection = URL(AI_BACKEND_URL).openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.connectTimeout = 20000
-                connection.readTimeout = 45000
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.setRequestProperty("Accept", "application/json")
-                val messages = JSONArray()
-                messages.put(JSONObject().put("role", "system").put("content",
-                    "তুমি বাংলার AI। সহজ, পরিষ্কার ও স্বাভাবিক বাংলায় উত্তর দেবে। প্রশ্ন অনুযায়ী প্রয়োজনীয় তথ্য বুঝিয়ে বলবে।"))
-                for (item in conversation.takeLast(16)) {
-                    messages.put(JSONObject().put("role", item.first).put("content", item.second))
-                }
-                val body = JSONObject().put("messages", messages)
-                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-                val code = connection.responseCode
-                val response = if (code in 200..299) {
-                    connection.inputStream.bufferedReader().use { it.readText() }
-                } else {
-                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-                }
-                answer = if (code in 200..299) {
-                    JSONObject(response).getJSONArray("choices").getJSONObject(0)
-                        .getJSONObject("message").getString("content").trim()
-                } else when (code) {
-                    401, 403 -> "AI সার্ভারের অনুমোদন সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।"
-                    429 -> "এখন অনেক ব্যবহারকারী AI ব্যবহার করছেন। একটু পরে আবার চেষ্টা করুন।"
-                    else -> "AI সার্ভারে সমস্যা হয়েছে ($code)। কিছুক্ষণ পরে আবার চেষ্টা করুন।"
-                }
-            } catch (_: Exception) {
-                answer = "বাংলার AI সার্ভারে সংযোগ করা যাচ্ছে না। ইন্টারনেট পরীক্ষা করুন।"
-            } finally {
-                connection?.disconnect()
-            }
-            runOnUiThread {
-                busy = false
-                statusText.text = "● AI প্রস্তুত"
-                statusText.setTextColor(green)
-                addMessage(false, answer)
-                conversation.add(Pair("assistant", answer))
-                saveConversation()
-                if (voiceEnabled) speak(answer)
-            }
-        }.start()
-    }
-
     // TEXT TO SPEECH
+
+// TEXT TO SPEECH
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -902,96 +996,79 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun startListening() {
         if (busy || listening) return
-
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(
-                this,
-                "Speech Recognition পাওয়া যায়নি",
-                Toast.LENGTH_LONG
-            ).show()
+        if (android.os.Build.VERSION.SDK_INT < 31 ||
+            !SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+            voiceEnabled = false
+            updateCallButtons()
+            statusText.text = "● অফলাইন বাংলা ভয়েস সুবিধা পাওয়া যায়নি"
+            statusText.setTextColor(Color.YELLOW)
+            Toast.makeText(this,
+                "এই ফোনে অন-ডিভাইস Speech Recognition বা বাংলা Offline ভাষা প্যাক পাওয়া যায়নি। Speech Settings-এ বাংলা Offline ভাষা ইনস্টল করুন।",
+                Toast.LENGTH_LONG).show()
             return
         }
-
         try {
             if (recognizer == null) {
-                recognizer = SpeechRecognizer.createSpeechRecognizer(this)
-
-                recognizer?.setRecognitionListener(
-                    object : RecognitionListener {
-
-                        override fun onReadyForSpeech(params: Bundle?) {
-                            listening = true
-                            statusText.text = "● শুনছি..."
-                            statusText.setTextColor(Color.rgb(255, 170, 40))
-                        }
-
-                        override fun onBeginningOfSpeech() {}
-                        override fun onRmsChanged(rmsdB: Float) {}
-                        override fun onBufferReceived(buffer: ByteArray?) {}
-
-                        override fun onEndOfSpeech() {
-                            listening = false
-                        }
-
-                        override fun onError(error: Int) {
-                            listening = false
-                            if (voiceEnabled && !busy) {
-                                handler.postDelayed({
-                                    startListening()
-                                }, 1200)
-                            }
-                        }
-
-                        override fun onResults(results: Bundle?) {
-                            listening = false
-
-                            val words = results?.getStringArrayList(
-                                SpeechRecognizer.RESULTS_RECOGNITION
-                            )
-
-                            val spoken = words?.firstOrNull()?.trim()
-
-                            if (!spoken.isNullOrEmpty()) {
-                                inputBox.setText(spoken)
-                                sendMessage()
-                            } else if (voiceEnabled) {
-                                handler.postDelayed({
-                                    startListening()
-                                }, 700)
-                            }
-                        }
-
-                        override fun onPartialResults(partialResults: Bundle?) {}
-                        override fun onEvent(eventType: Int, params: Bundle?) {}
+                recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+                recognizer?.setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        listening = true
+                        statusText.text = "● অফলাইনে শুনছি..."
+                        statusText.setTextColor(Color.rgb(255, 170, 40))
                     }
-                )
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() { listening = false }
+                    override fun onError(error: Int) {
+                        listening = false
+                        if (voiceEnabled && !busy) {
+                            if (error == SpeechRecognizer.ERROR_NO_MATCH ||
+                                error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                                handler.postDelayed({ startListening() }, 650)
+                            } else {
+                                voiceEnabled = false
+                                updateCallButtons()
+                                statusText.text = "● ভয়েস বন্ধ — অফলাইন ভাষা পরীক্ষা করুন"
+                                statusText.setTextColor(Color.YELLOW)
+                                Toast.makeText(this@MainActivity,
+                                    "অফলাইন ভয়েস কাজ করেনি। বাংলা Offline ভাষা প্যাক ও Speech Settings পরীক্ষা করুন।",
+                                    Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                    override fun onResults(results: Bundle?) {
+                        listening = false
+                        val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val spoken = words?.firstOrNull()?.trim()
+                        if (!spoken.isNullOrEmpty()) {
+                            inputBox.setText(spoken)
+                            sendMessage()
+                        } else if (voiceEnabled) {
+                            handler.postDelayed({ startListening() }, 650)
+                        }
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
             }
-
-            val intent = Intent(
-                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-            ).apply {
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                )
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             }
-
             recognizer?.startListening(intent)
-
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             listening = false
-            Toast.makeText(
-                this,
-                "মাইক্রোফোন চালু করা যায়নি",
-                Toast.LENGTH_SHORT
-            ).show()
+            voiceEnabled = false
+            updateCallButtons()
+            Toast.makeText(this, "অফলাইন মাইক্রোফোন চালু করা যায়নি। Speech Settings পরীক্ষা করুন।", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun stopListening() {
+private fun stopListening() {
         listening = false
         try {
             recognizer?.cancel()
@@ -1042,10 +1119,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun toggleFlashlight() {
+    private fun toggleFlashlight(forceState: Boolean? = null) {
         if (checkSelfPermission(Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            pendingTorchState = forceState
             requestPermissions(
                 arrayOf(Manifest.permission.CAMERA),
                 CAMERA_PERMISSION
@@ -1067,7 +1145,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 return
             }
 
-            torchOn = !torchOn
+            torchOn = forceState ?: !torchOn
+            pendingTorchState = null
             manager.setTorchMode(cameraId, torchOn)
 
             Toast.makeText(
@@ -1197,8 +1276,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if (grantResults.isNotEmpty() &&
                 grantResults[0] == PackageManager.PERMISSION_GRANTED
             ) {
-                toggleFlashlight()
+                toggleFlashlight(pendingTorchState)
             } else {
+                pendingTorchState = null
                 Toast.makeText(
                     this,
                     "ক্যামেরা অনুমতি প্রয়োজন",

@@ -69,6 +69,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var hangupButton: Button
     private lateinit var aiOrb: TextView
     private var orbPulse: ObjectAnimator? = null
+    private var orbScaleX: ObjectAnimator? = null
+    private var orbScaleY: ObjectAnimator? = null
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -228,12 +230,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         powerButton.textSize = 16f
         powerButton.setTextColor(Color.WHITE)
         powerButton.background = rounded(Color.rgb(0, 170, 90), 28)
-        powerButton.setOnClickListener { startVoiceCall() }
+        powerButton.setOnClickListener { animateCallButton(powerButton) { startVoiceCall() } }
         hangupButton = makeButton("✕  কল কাটুন")
         hangupButton.textSize = 16f
         hangupButton.setTextColor(Color.WHITE)
         hangupButton.background = rounded(Color.rgb(205, 45, 58), 28)
-        hangupButton.setOnClickListener { endVoiceCall() }
+        hangupButton.setOnClickListener { animateCallButton(hangupButton) { endVoiceCall() } }
         updateCallButtons()
 
         hero.addView(orb, LinearLayout.LayoutParams(dp(172), dp(172)))
@@ -855,13 +857,34 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             repeatCount = ValueAnimator.INFINITE
             start()
         }
-        aiOrb.animate().scaleX(1.08f).scaleY(1.08f).setDuration(700).start()
+        orbScaleX = ObjectAnimator.ofFloat(aiOrb, "scaleX", 1f, 1.08f, 1f).apply {
+            duration = 1400
+            repeatCount = ValueAnimator.INFINITE
+            start()
+        }
+        orbScaleY = ObjectAnimator.ofFloat(aiOrb, "scaleY", 1f, 1.08f, 1f).apply {
+            duration = 1400
+            repeatCount = ValueAnimator.INFINITE
+            start()
+        }
     }
 
     private fun stopOrbAnimation() {
         orbPulse?.cancel()
+        orbScaleX?.cancel()
+        orbScaleY?.cancel()
         orbPulse = null
+        orbScaleX = null
+        orbScaleY = null
         if (::aiOrb.isInitialized) aiOrb.animate().rotation(0f).scaleX(1f).scaleY(1f).setDuration(350).start()
+    }
+
+    private fun animateCallButton(button: View, action: () -> Unit) {
+        button.animate().scaleX(0.93f).scaleY(0.93f).setDuration(90).withEndAction {
+            button.animate().scaleX(1f).scaleY(1f).setDuration(130).withEndAction {
+                action()
+            }.start()
+        }.start()
     }
 
     private fun checkMicPermissionAndListen() {

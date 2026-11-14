@@ -224,12 +224,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTextColor(green)
         }
-        powerButton = makeButton("●  কল করুন")
+        powerButton = makeButton("☎  কল করুন")
         powerButton.textSize = 16f
         powerButton.setTextColor(Color.WHITE)
         powerButton.background = rounded(Color.rgb(0, 170, 90), 28)
         powerButton.setOnClickListener { startVoiceCall() }
-        hangupButton = makeButton("■  কল কাটুন")
+        hangupButton = makeButton("✕  কল কাটুন")
         hangupButton.textSize = 16f
         hangupButton.setTextColor(Color.WHITE)
         hangupButton.background = rounded(Color.rgb(205, 45, 58), 28)
@@ -756,7 +756,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 addMessage(false, answer)
                 conversation.add(Pair("assistant", answer))
                 saveConversation()
-                speak(answer)
+                if (voiceEnabled) speak(answer)
             }
         }.start()
     }

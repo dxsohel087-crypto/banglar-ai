@@ -33,15 +33,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     companion object {
          private const val OVERLAY_PERMISSION = 401
-        // Replace with the deployed shared backend URL before public release.
-        private const val AI_BACKEND_URL =
-            "https://YOUR-BANGLAR-AI-WORKER.workers.dev/v1/chat/completions"
-
         private const val MIC_PERMISSION = 101
         private const val CAMERA_PERMISSION = 102
     }
@@ -516,7 +514,58 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         parent.addView(card, params)
     }
 
-// DESIGN HELPERS
+private fun buildSettingsPage(): View {
+        val page = pageShell("সেটিংস", "NEXVIO অফলাইনে চলে। প্রয়োজনীয় অনুমতি আপনি নিজে নিয়ন্ত্রণ করবেন।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        pageAction(list, "🎙 মাইক্রোফোন অনুমতি", "আপনার কথা শোনার জন্য।") {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_PERMISSION)
+            } else Toast.makeText(this, "মাইক্রোফোন অনুমতি চালু আছে", Toast.LENGTH_SHORT).show()
+        }
+        pageAction(list, "📷 ক্যামেরা অনুমতি", "ফ্ল্যাশলাইট ও ক্যামেরা কমান্ডের জন্য।") {
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION)
+            } else openCamera()
+        }
+        pageAction(list, "♿ Accessibility চালু করুন", "আপনার সরাসরি নির্দেশে অন্য অ্যাপের দৃশ্যমান লেখা পড়া বা নির্বাচিত আইটেমে চাপ দেওয়ার জন্য।") {
+            openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        }
+        pageAction(list, "🪟 ভাসমান কন্ট্রোল", "অন্য অ্যাপের ওপর NEXVIO শর্টকাট দেখানোর ঐচ্ছিক সুবিধা।") {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
+                !Settings.canDrawOverlays(this)) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + packageName)))
+            } else {
+                toggleFloatingAssistant()
+            }
+        }
+        pageAction(list, "🗣 অফলাইন বাংলা Speech Settings", "ফোনে On-device recognition থাকলে বাংলা Offline ভাষা প্যাক ইনস্টল করুন।") {
+            try {
+                startActivity(Intent("android.speech.action.MULTI_LANGUAGE_SETTINGS"))
+            } catch (_: Exception) {
+                openSettings(Settings.ACTION_SETTINGS)
+            }
+        }
+        pageAction(list, "📁 ফাইল পিকার", "নিজে নির্বাচন করে ছবি, ভিডিও বা ডকুমেন্ট খুলুন।") { openGallery() }
+        pageAction(list, "🛡 গোপনীয়তা", "কমান্ড এই ফোনেই যাচাই হয়। NEXVIO-তে Internet permission বা AI server connection নেই।") {
+            AlertDialog.Builder(this)
+                .setTitle("NEXVIO গোপনীয়তা")
+                .setMessage("আপনার কমান্ড ও কথোপকথনের ইতিহাস এই ডিভাইসেই থাকে। NEXVIO কোনো AI সার্ভারে লেখা, ভয়েস বা স্ক্রিন পাঠায় না। অফলাইন ভয়েসের জন্য ফোনের নিজস্ব On-device Speech Recognition ব্যবহার হয়।")
+                .setPositiveButton("ঠিক আছে", null).show()
+        }
+        pageAction(list, "ℹ অ্যাপ সম্পর্কে", "NEXVIO • Offline Voice Phone Control") {
+            AlertDialog.Builder(this)
+                .setTitle("NEXVIO")
+                .setMessage("আপনার কণ্ঠে ফোনের অনুমোদিত কাজ সম্পন্ন করার অফলাইন কন্ট্রোলার। সব Android সেটিংস সরাসরি বদলানো যায় না; কিছু ক্ষেত্রে Settings পেজ খুলবে।")
+                .setPositiveButton("বন্ধ", null).show()
+        }
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
+    }
+
+    // DESIGN HELPERS
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
@@ -1083,16 +1132,6 @@ private fun stopListening() {
             startActivity(Intent(action))
         } catch (_: Exception) {
             Toast.makeText(this, "সেটিংস খোলা যাচ্ছে না", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun openUrl(url: String) {
-        try {
-            startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            )
-        } catch (_: Exception) {
-            Toast.makeText(this, "লিংক খোলা যাচ্ছে না", Toast.LENGTH_SHORT).show()
         }
     }
 

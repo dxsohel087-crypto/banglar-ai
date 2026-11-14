@@ -344,7 +344,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(dp(5), dp(7), dp(5), dp(7))
             setBackgroundColor(Color.rgb(9, 23, 19))
         }
-        val items = listOf("⌂\nহোম", "✉\nচ্যাট", "▦\nটুলস", "◷\nইতিহাস", "⚙\nসেটিংস")
+        val items = listOf("⌂\nহোম", "✉\nচ্যাট", "✧\nস্টোরি", "◷\nইতিহাস", "⚙\nসেটিংস")
         items.forEachIndexed { index, label ->
             val button = TextView(this).apply {
                 text = label
@@ -1109,7 +1109,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 startListening()
             } else {
                 voiceEnabled = false
-                powerButton.text = "AI চালু করুন"
+                updateCallButtons()
                 Toast.makeText(
                     this,
                     "মাইক্রোফোন অনুমতি প্রয়োজন",

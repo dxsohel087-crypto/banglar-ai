@@ -216,7 +216,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(0, dp(8), 0, dp(2))
         }
         statusText = TextView(this).apply {
-            text = "● AI প্রস্তুত"
+            text = "● NEXVIO প্রস্তুত"
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(green)
@@ -254,9 +254,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val chatTitle = sectionTitle("AI CHAT")
+        val chatTitle = sectionTitle("NEXVIO COMMAND")
         val online = TextView(this).apply {
-            text = "● LIVE"
+            text = "● OFFLINE"
             textSize = 10f
             setTextColor(green)
             gravity = Gravity.CENTER_VERTICAL
@@ -349,7 +349,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(dp(5), dp(7), dp(5), dp(7))
             setBackgroundColor(Color.rgb(9, 23, 19))
         }
-        val items = listOf("⌂\nহোম", "✉\nকমান্ড", "✧\nসিস্টেম", "◷\nইতিহাস", "⚙\nসেটিংস")
+        val items = listOf("⌂\nহোম", "✉\nচ্যাট", "✧\nকমান্ড", "◷\nইতিহাস", "⚙\nসেটিংস")
         items.forEachIndexed { index, label ->
             val button = TextView(this).apply {
                 text = label
@@ -738,15 +738,15 @@ private fun buildSettingsPage(): View {
                         android.media.AudioManager.ADJUST_LOWER, android.media.AudioManager.FLAG_SHOW_UI)
                     completeLocalAction("মিডিয়া ভলিউম কমিয়েছি।")
                 }
-                has("মিউট", "নীরব", "mute", "বন্ধ") -> {
-                    audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
-                        android.media.AudioManager.ADJUST_MUTE, android.media.AudioManager.FLAG_SHOW_UI)
-                    completeLocalAction("মিডিয়া সাউন্ড মিউট করেছি।")
-                }
                 has("আনমিউট", "শব্দ চালু", "সাউন্ড চালু", "unmute") -> {
                     audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
                         android.media.AudioManager.ADJUST_UNMUTE, android.media.AudioManager.FLAG_SHOW_UI)
                     completeLocalAction("মিডিয়া সাউন্ড চালু করেছি।")
+                }
+                has("মিউট", "নীরব", "mute", "বন্ধ") -> {
+                    audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        android.media.AudioManager.ADJUST_MUTE, android.media.AudioManager.FLAG_SHOW_UI)
+                    completeLocalAction("মিডিয়া সাউন্ড মিউট করেছি।")
                 }
                 else -> {
                     openSettings(Settings.ACTION_SOUND_SETTINGS)

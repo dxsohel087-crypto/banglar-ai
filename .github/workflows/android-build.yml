@@ -1,4 +1,4 @@
-name: Banglar AI APK Build
+name: NEXVIO Offline APK Build
 
 on:
   push:
@@ -55,7 +55,7 @@ jobs:
         if: steps.kotlin_check.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: Banglar-AI-APK
+          name: NEXVIO-APK
           path: app/build/outputs/apk/debug/*.apk
 
       - name: Report Kotlin Failure

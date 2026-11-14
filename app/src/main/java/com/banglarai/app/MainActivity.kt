@@ -362,6 +362,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun renderTab(index: Int) {
         selectedTab = index
         contentHost.removeAllViews()
+        (chatHeading.parent as? ViewGroup)?.removeView(chatHeading)
+        (chatScroll.parent as? ViewGroup)?.removeView(chatScroll)
+        (inputRow.parent as? ViewGroup)?.removeView(inputRow)
         when (index) {
             0 -> contentHost.addView(homeBody, FrameLayout.LayoutParams(-1, -1))
             1 -> {
@@ -952,8 +955,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun openGallery() {
         try {
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                type = "image/*"
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "*/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "application/pdf", "text/plain"))
             }
             startActivityForResult(intent, 300)
         } catch (_: Exception) {

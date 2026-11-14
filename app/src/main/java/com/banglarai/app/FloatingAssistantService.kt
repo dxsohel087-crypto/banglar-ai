@@ -34,7 +34,7 @@ class FloatingAssistantService : Service() {
     private fun showBubble() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val view = TextView(this).apply {
-            text = "বাংলার AI"
+            text = "NEXVIO"
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(0xFF052018.toInt())

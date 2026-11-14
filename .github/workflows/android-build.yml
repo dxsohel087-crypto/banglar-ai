@@ -3,6 +3,8 @@ name: NEXVIO Offline APK Build
 on:
   push:
     branches: [main, master, 'feature/**']
+  pull_request:
+    branches: [feature/full-app-navigation-settings]
   workflow_dispatch:
 
 permissions:

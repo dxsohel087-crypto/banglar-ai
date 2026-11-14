@@ -512,7 +512,36 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val params = LinearLayout.LayoutParams(-1, -2)
         params.setMargins(0, 0, 0, dp(11))
         parent.addView(card, params)
+    }    private fun buildHistoryPage(): View {
+        val page = pageShell("কমান্ডের ইতিহাস", "এই ফোনে সংরক্ষিত সাম্প্রতিক কথোপকথন ও কমান্ড।")
+        val scroll = ScrollView(this)
+        val list = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        if (conversation.isEmpty()) {
+            pageAction(list, "এখনো কোনো ইতিহাস নেই", "NEXVIO-তে কমান্ড দিলে এখানে দেখা যাবে।") {
+                renderTab(1)
+            }
+        } else {
+            conversation.takeLast(80).forEach { item ->
+                val label = if (item.first == "user") "আপনি" else "NEXVIO"
+                pageAction(list, label, item.second) {
+                    renderTab(1)
+                }
+            }
+            pageAction(list, "ইতিহাস মুছুন", "এই ডিভাইসে সংরক্ষিত কথোপকথন মুছে যাবে।") {
+                clearChat()
+                renderTab(3)
+            }
+        }
+
+        scroll.addView(list)
+        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        return page
     }
+
+
 
 private fun buildSettingsPage(): View {
         val page = pageShell("সেটিংস", "NEXVIO অফলাইনে চলে। প্রয়োজনীয় অনুমতি আপনি নিজে নিয়ন্ত্রণ করবেন।")
